@@ -1889,6 +1889,9 @@ def _do_import(filepath, ext, mapping, default_class, default_grade):
     return imported, skipped, errors, sample_ids
 
 
+# Expose global 'app' for gunicorn (Render uses 'gunicorn app:app')
+app = create_app()
+
 if __name__ == '__main__':
     import sys as _sys, io as _io
     _sys.stdout = _io.TextIOWrapper(_sys.stdout.buffer, encoding='utf-8', errors='replace')
