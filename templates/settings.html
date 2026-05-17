@@ -1,0 +1,283 @@
+{% extends 'base.html' %}
+{% block title %}הגדרות — מערכת ייעוץ{% endblock %}
+{% block page_title %}הגדרות מערכת{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- System Stats -->
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-info-circle-fill text-primary me-2"></i>סטטיסטיקות מערכת
+      </div>
+      <div class="card-body">
+        <table class="table table-borderless info-table mb-0">
+          <tr><th>תלמידים במערכת</th><td><strong>{{ total_students }}</strong></td></tr>
+          <tr><th>תיעודים</th><td><strong>{{ total_docs }}</strong></td></tr>
+          <tr><th>משימות</th><td><strong>{{ total_tasks }}</strong></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-shield-lock-fill text-success me-2"></i>אבטחה
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-2">שנה סיסמה אישית:</p>
+        <form method="POST" action="{{ url_for('settings') }}">
+          <input type="hidden" name="action" value="change_password">
+          <input type="hidden" name="user_id" value="{{ current_user.id }}">
+          <div class="mb-2">
+            <input type="password" name="new_password" class="form-control form-control-sm"
+                   placeholder="סיסמה חדשה" dir="ltr" required minlength="6">
+          </div>
+          <button type="submit" class="btn btn-sm btn-outline-success w-100">
+            <i class="bi bi-key-fill"></i> שנה סיסמה
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="card mt-3 border-danger">
+      <div class="card-header fw-semibold text-danger">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>אזור מסוכן
+      </div>
+      <div class="card-body">
+        <p class="small text-muted mb-3">
+          מחיקת כל הנתונים תסיר את כל התלמידים, התיעודים, השירותים והמשימות.
+          <strong>פעולה זו אינה הפיכה.</strong><br>
+          המשתמשים וסיסמאות <em>לא</em> יימחקו.
+        </p>
+        <button class="btn btn-outline-danger btn-sm w-100"
+                data-bs-toggle="modal" data-bs-target="#resetModal">
+          <i class="bi bi-trash3-fill me-1"></i>מחק את כל הנתונים
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- User Management -->
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center fw-semibold">
+        <span><i class="bi bi-people-fill text-primary me-2"></i>ניהול משתמשים</span>
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal">
+          <i class="bi bi-person-plus-fill"></i> הוסף משתמש
+        </button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>שם מלא</th>
+              <th>שם משתמש</th>
+              <th>תפקיד</th>
+              <th>סטטוס</th>
+              <th>נוצר</th>
+              <th>פעולות</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in users %}
+            <tr {% if not u.is_active %}class="text-muted opacity-60"{% endif %}>
+              <td class="fw-semibold">{{ u.full_name }}</td>
+              <td dir="ltr">{{ u.username }}</td>
+              <td>
+                <span class="badge {% if u.role == 'admin' %}bg-primary{% else %}bg-secondary{% endif %}">
+                  {{ 'מנהל' if u.role == 'admin' else 'צפייה בלבד' }}
+                </span>
+              </td>
+              <td>
+                <span class="badge {% if u.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                  {{ 'פעיל' if u.is_active else 'מושבת' }}
+                </span>
+              </td>
+              <td class="small text-muted">{{ u.created_at.strftime('%d/%m/%Y') }}</td>
+              <td>
+                <div class="d-flex gap-1">
+                  <!-- Reset Password -->
+                  <button class="btn btn-sm btn-outline-secondary"
+                          data-bs-toggle="modal" data-bs-target="#resetPwModal"
+                          data-user-id="{{ u.id }}" data-user-name="{{ u.full_name }}"
+                          title="שנה סיסמה">
+                    <i class="bi bi-key"></i>
+                  </button>
+                  <!-- Toggle Active -->
+                  {% if u.id != current_user.id %}
+                  <form method="POST" action="{{ url_for('settings') }}" class="d-inline">
+                    <input type="hidden" name="action" value="toggle_user">
+                    <input type="hidden" name="user_id" value="{{ u.id }}">
+                    <button type="submit" class="btn btn-sm {% if u.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %}"
+                            title="{{ 'השבת' if u.is_active else 'הפעל' }}"
+                            onclick="return confirm('{{ 'להשבית' if u.is_active else 'להפעיל' }} את {{ u.full_name }}?')">
+                      <i class="bi {% if u.is_active %}bi-person-slash{% else %}bi-person-check{% endif %}"></i>
+                    </button>
+                  </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Help -->
+    <div class="card mt-3">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-question-circle-fill text-info me-2"></i>מדריך שימוש מהיר
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <h6 class="fw-semibold">כניסה ראשונה</h6>
+            <ol class="small text-muted">
+              <li>התחבר עם שם משתמש <code>admin</code> וסיסמה <code>counselor2024</code></li>
+              <li>שנה את הסיסמה בהגדרות</li>
+              <li>הוסף משתמשים נוספים לפי הצורך</li>
+            </ol>
+          </div>
+          <div class="col-md-6">
+            <h6 class="fw-semibold">שגרת יומית</h6>
+            <ol class="small text-muted">
+              <li>בדוק לוח בקרה — התראות ומשימות</li>
+              <li>חפש תלמיד לפי שם/כיתה</li>
+              <li>תעד שיחות ומפגשים</li>
+              <li>סמן משימות שהושלמו</li>
+            </ol>
+          </div>
+          <div class="col-12">
+            <div class="alert alert-info small mb-0">
+              <i class="bi bi-info-circle me-1"></i>
+              <strong>תפקידים:</strong> מנהל יכול להוסיף/לערוך נתונים. צפייה בלבד — יכול לראות מידע בלבד, ללא שינויים.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add User Modal -->
+<div class="modal fade" id="addUserModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">הוספת משתמש חדש</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('settings') }}">
+        <div class="modal-body">
+          <input type="hidden" name="action" value="add_user">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">שם מלא</label>
+            <input type="text" name="full_name" class="form-control" required placeholder="שם מלא">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">שם משתמש</label>
+            <input type="text" name="username" class="form-control" required dir="ltr"
+                   placeholder="username (באנגלית, ללא רווחים)">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">סיסמה ראשונית</label>
+            <input type="text" name="password" class="form-control" dir="ltr"
+                   value="temp1234" required minlength="6">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">תפקיד</label>
+            <select name="role" class="form-select">
+              <option value="reader">צפייה בלבד</option>
+              <option value="admin">מנהל (עריכה מלאה)</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">ביטול</button>
+          <button type="submit" class="btn btn-primary">הוסף משתמש</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal fade" id="resetPwModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">איפוס סיסמה</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('settings') }}">
+        <div class="modal-body">
+          <input type="hidden" name="action" value="change_password">
+          <input type="hidden" name="user_id" id="resetPwUserId">
+          <p>שנה סיסמה למשתמש: <strong id="resetPwUserName"></strong></p>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">סיסמה חדשה</label>
+            <input type="text" name="new_password" class="form-control" dir="ltr"
+                   required minlength="6" placeholder="לפחות 6 תווים">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">ביטול</button>
+          <button type="submit" class="btn btn-primary">שמור סיסמה</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Reset All Data Modal -->
+<div class="modal fade" id="resetModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content border-danger">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>מחיקת כל הנתונים
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('settings') }}">
+        <div class="modal-body">
+          <input type="hidden" name="action" value="reset_all_data">
+          <div class="alert alert-danger">
+            <strong>אזהרה!</strong> פעולה זו תמחק לצמיתות:
+            <ul class="mb-0 mt-1">
+              <li>{{ total_students }} תלמידים</li>
+              <li>{{ total_docs }} תיעודים</li>
+              <li>{{ total_tasks }} משימות</li>
+              <li>כל השירותים, הקבצים והמידע</li>
+            </ul>
+          </div>
+          <p class="fw-semibold mb-2">להמשך — הקלידי בדיוק: <code>מחק הכל</code></p>
+          <input type="text" name="confirm_reset" class="form-control"
+                 placeholder='הקלידי: מחק הכל' dir="rtl" required
+                 autocomplete="off">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ביטול</button>
+          <button type="submit" class="btn btn-danger">
+            <i class="bi bi-trash3-fill me-1"></i>מחק הכל לצמיתות
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('resetPwModal').addEventListener('show.bs.modal', function(e) {
+  const btn = e.relatedTarget;
+  document.getElementById('resetPwUserId').value = btn.getAttribute('data-user-id');
+  document.getElementById('resetPwUserName').textContent = btn.getAttribute('data-user-name');
+});
+</script>
+{% endblock %}

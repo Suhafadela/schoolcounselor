@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block auth_content %}
+<div class="login-page">
+  <div class="login-card">
+    <div class="login-logo">
+      <i class="bi bi-mortarboard-fill"></i>
+    </div>
+    <h1 class="login-title">מערכת ייעוץ חינוכי</h1>
+    <p class="login-subtitle">כניסה למערכת</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('login') }}">
+      <div class="mb-3">
+        <label class="form-label fw-semibold">שם משתמש</label>
+        <div class="input-group">
+          <span class="input-group-text"><i class="bi bi-person"></i></span>
+          <input type="text" name="username" class="form-control" placeholder="הזן שם משתמש"
+                 dir="ltr" required autofocus>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="form-label fw-semibold">סיסמה</label>
+        <div class="input-group">
+          <span class="input-group-text"><i class="bi bi-lock"></i></span>
+          <input type="password" name="password" class="form-control" placeholder="הזן סיסמה"
+                 dir="ltr" required>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary w-100 btn-lg">
+        <i class="bi bi-box-arrow-in-right"></i> כניסה למערכת
+      </button>
+    </form>
+
+    <div class="login-footer">
+      <small class="text-muted">מערכת ניהול ייעוץ חינוכי | פרטי גישה דרך מנהל המערכת</small>
+    </div>
+  </div>
+</div>
+{% endblock %}

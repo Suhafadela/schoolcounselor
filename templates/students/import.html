@@ -1,0 +1,334 @@
+{% extends 'base.html' %}
+{% block title %}ייבוא תלמידים מאקסל — מערכת ייעוץ{% endblock %}
+{% block page_title %}ייבוא תלמידים מקובץ Excel{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-md-7">
+
+{% if step == 'upload' %}
+{# ══ Upload Form ═══════════════════════════════════════════════════════════ #}
+<div class="card">
+  <div class="card-header fw-semibold">
+    <i class="bi bi-file-earmark-excel-fill text-success me-2"></i>
+    ייבוא תלמידים מקובץ Excel
+  </div>
+  <div class="card-body">
+
+    <div class="alert alert-info small mb-4">
+      <i class="bi bi-info-circle-fill me-1"></i>
+      <strong>המערכת מזהה אוטומטית</strong> עמודות כגון: שם תלמיד, הורים, טלפון, מין, תאריך לידה.<br>
+      פורמטים נתמכים: <strong>.xlsx / .xls / .csv</strong>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" action="{{ url_for('students_import') }}">
+      <input type="hidden" name="step" value="upload">
+
+      <!-- File picker -->
+      <div class="mb-4">
+        <label class="form-label fw-semibold">בחרי קובץ Excel</label>
+        <input type="file" name="excel_file" id="excelFile" class="form-control"
+               accept=".xlsx,.xls,.csv" required>
+      </div>
+
+      <!-- Default class / grade (in case file has no class column) -->
+      <div class="row g-3 mb-4">
+        <div class="col-6">
+          <label class="form-label fw-semibold small">
+            כיתה ברירת מחדל
+            <span class="text-muted fw-normal">(אם לא בקובץ)</span>
+          </label>
+          <input type="text" name="default_class" class="form-control"
+                 placeholder="לדוגמה: ז'1">
+          <div class="form-text text-info">
+            <i class="bi bi-info-circle"></i>
+            קובץ שמכיל עמודת שכבה (ז/ח) אך לא עמודת כיתה — יש למלא כאן.
+          </div>
+        </div>
+        <div class="col-6">
+          <label class="form-label fw-semibold small">
+            שכבה ברירת מחדל
+            <span class="text-muted fw-normal">(אם לא בקובץ)</span>
+          </label>
+          <select name="default_grade" class="form-select">
+            <option value="">— אוטומטי לפי כיתה —</option>
+            <option value="ז">ז׳</option>
+            <option value="ח">ח׳</option>
+            <option value="ט">ט׳</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Detection preview (filled by JS) -->
+      <div id="detectionResult" class="mb-3" style="display:none;">
+        <div class="card border-0 bg-light">
+          <div class="card-body py-2 px-3 small">
+            <strong>עמודות שיזוהו:</strong>
+            <div id="detectedBadges" class="mt-1 d-flex flex-wrap gap-1"></div>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-success btn-lg w-100">
+        <i class="bi bi-database-fill-add me-2"></i>העלה וייבא תלמידים
+      </button>
+    </form>
+
+  </div>
+</div>
+
+<!-- Column name tips -->
+<div class="card mt-3 border-0 bg-light">
+  <div class="card-body small">
+    <strong class="text-muted">שמות עמודות שהמערכת מזהה (אין חובה להתאים בדיוק):</strong>
+    <div class="row mt-2 g-1">
+      <div class="col-6">
+        <span class="badge bg-secondary me-1">שם התלמיד</span>
+        <span class="badge bg-secondary me-1">שם תלמיד</span>
+        <span class="badge bg-secondary me-1">שם</span><br>
+        <span class="badge bg-secondary me-1">שם פרטי</span>
+        <span class="badge bg-secondary me-1">שם משפחה</span>
+      </div>
+      <div class="col-6">
+        <span class="badge bg-secondary me-1">הורה</span>
+        <span class="badge bg-secondary me-1">אמא</span>
+        <span class="badge bg-secondary me-1">אבא</span><br>
+        <span class="badge bg-secondary me-1">טלפון</span>
+        <span class="badge bg-secondary me-1">נייד</span>
+        <span class="badge bg-secondary me-1">מין</span>
+        <span class="badge bg-secondary me-1">לידה</span>
+      </div>
+    </div>
+    <div class="mt-2 text-muted">
+      <i class="bi bi-lightbulb me-1"></i>
+      אם הקובץ שלך מכיל שם אחר — המערכת תנסה לזהות אותו בכל מקרה.
+      אם לא מצליחה, <a href="{{ url_for('students_import') }}?advanced=1">לחצי כאן לייבוא מתקדם עם בחירת עמודות ידנית</a>.
+    </div>
+  </div>
+</div>
+
+{% elif step == 'results' %}
+{# ══ Import Results ════════════════════════════════════════════════════════ #}
+<div class="card mb-4">
+  <div class="card-header fw-semibold bg-success text-white">
+    <i class="bi bi-check-circle-fill me-2"></i>ייבוא הסתיים
+  </div>
+  <div class="card-body">
+
+    <div class="row g-3 mb-4">
+      <div class="col-4 text-center">
+        <div class="display-5 fw-bold text-success">{{ imported }}</div>
+        <div class="small text-muted">יובאו בהצלחה</div>
+      </div>
+      <div class="col-4 text-center">
+        <div class="display-5 fw-bold text-warning">{{ skipped }}</div>
+        <div class="small text-muted">דולגו (כפולים)</div>
+      </div>
+      <div class="col-4 text-center">
+        <div class="display-5 fw-bold text-danger">{{ errors|length }}</div>
+        <div class="small text-muted">שגיאות</div>
+      </div>
+    </div>
+
+    <!-- Detected columns summary -->
+    {% if detected_cols %}
+    <h6 class="fw-semibold mb-2">עמודות שזוהו בקובץ:</h6>
+    <div class="d-flex flex-wrap gap-2 mb-3">
+      {% for field_label, col_name in detected_cols.items() %}
+      {% if col_name %}
+      <span class="badge bg-success-subtle text-success-emphasis border border-success">
+        <i class="bi bi-check-lg me-1"></i>{{ field_label }}: <em>{{ col_name }}</em>
+      </span>
+      {% else %}
+      <span class="badge bg-light text-muted border">
+        <i class="bi bi-dash me-1"></i>{{ field_label }}: לא זוהה
+      </span>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if errors %}
+    <div class="alert alert-warning small">
+      <strong>שגיאות בשורות אחדות:</strong>
+      <ul class="mb-0 mt-1">
+        {% for e in errors[:5] %}
+        <li>{{ e }}</li>
+        {% endfor %}
+        {% if errors|length > 5 %}
+        <li class="text-muted">... ועוד {{ errors|length - 5 }} שגיאות</li>
+        {% endif %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <!-- Preview of imported students -->
+    {% if sample_students %}
+    <h6 class="fw-semibold mb-2">דוגמה לתלמידים שיובאו:</h6>
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered mb-0" style="font-size:13px;">
+        <thead class="table-light">
+          <tr><th>שם</th><th>כיתה</th><th>הורה 1</th><th>טלפון</th><th>מין</th><th>ת. לידה</th></tr>
+        </thead>
+        <tbody>
+          {% for s in sample_students %}
+          <tr>
+            <td dir="auto">{{ s.full_name }}</td>
+            <td>{{ s.class_name }}</td>
+            <td dir="auto">{{ s.parent1_name or '—' }}</td>
+            <td dir="ltr">{{ s.parent1_phone or '—' }}</td>
+            <td>{{ s.gender or '—' }}</td>
+            <td>{{ s.dob.strftime('%d/%m/%Y') if s.dob else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+  </div>
+  <div class="card-footer d-flex gap-2 justify-content-end">
+    <a href="{{ url_for('students_import') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-upload me-1"></i>ייבוא קובץ נוסף
+    </a>
+    <a href="{{ url_for('students_list') }}" class="btn btn-primary">
+      <i class="bi bi-people-fill me-1"></i>לרשימת התלמידים
+    </a>
+  </div>
+</div>
+
+{% elif step == 'map' %}
+{# ══ Advanced: Manual column mapping ══════════════════════════════════════ #}
+<form method="POST" action="{{ url_for('students_import') }}">
+  <input type="hidden" name="step" value="confirm">
+  <input type="hidden" name="tmp_path" value="{{ tmp_path }}">
+  <input type="hidden" name="ext" value="{{ ext }}">
+  <input type="hidden" name="default_class" value="{{ request.args.get('default_class','') }}">
+  <input type="hidden" name="default_grade" value="{{ request.args.get('default_grade','') }}">
+
+  <div class="card mb-3">
+    <div class="card-header fw-semibold">
+      <i class="bi bi-sliders text-primary me-2"></i>
+      בחירת עמודות ידנית
+    </div>
+    <div class="card-body">
+      {% macro col_select(field_id, label) %}
+      {% set detected = auto_map.get(field_id, '') %}
+      <div class="mb-2 row align-items-center">
+        <label class="col-5 col-form-label col-form-label-sm fw-semibold">{{ label }}</label>
+        <div class="col-7">
+          <select name="{{ field_id }}" class="form-select form-select-sm {% if detected %}border-success{% endif %}">
+            <option value="">— לא רלוונטי —</option>
+            {% for h in headers %}
+            <option value="{{ h }}" {% if h == detected %}selected{% endif %}>{{ h }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      {% endmacro %}
+
+      {{ col_select('col_full_name',    'שם מלא') }}
+      {{ col_select('col_first_name',   'שם פרטי') }}
+      {{ col_select('col_last_name',    'שם משפחה') }}
+      {{ col_select('col_class_name',   'כיתה') }}
+      {{ col_select('col_grade_level',  'שכבה') }}
+      {{ col_select('col_gender',       'מין') }}
+      {{ col_select('col_dob',          'תאריך לידה') }}
+      {{ col_select('col_homeroom',     'מחנכת') }}
+      {{ col_select('col_parent1_name', 'שם הורה 1') }}
+      {{ col_select('col_parent1_phone','טלפון הורה 1') }}
+      {{ col_select('col_parent2_name', 'שם הורה 2') }}
+      {{ col_select('col_parent2_phone','טלפון הורה 2') }}
+
+      <hr class="my-3">
+      <div class="row g-2">
+        <div class="col-6">
+          <label class="form-label small fw-semibold">כיתה ברירת מחדל</label>
+          <input type="text" name="default_class" class="form-control form-control-sm" placeholder="ז'1">
+        </div>
+        <div class="col-6">
+          <label class="form-label small fw-semibold">שכבה ברירת מחדל</label>
+          <select name="default_grade" class="form-select form-select-sm">
+            <option value="">— אוטומטי —</option>
+            <option value="ז">ז׳</option>
+            <option value="ח">ח׳</option>
+            <option value="ט">ט׳</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Preview table -->
+  {% if preview %}
+  <div class="card mb-3">
+    <div class="card-header fw-semibold small">
+      <i class="bi bi-eye me-1"></i>תצוגה מקדימה ({{ preview|length }} שורות ראשונות)
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive" style="font-size:11px; max-height:200px; overflow:auto;">
+        <table class="table table-striped table-bordered mb-0">
+          <thead class="table-dark" style="position:sticky;top:0;">
+            <tr>{% for h in headers %}<th class="px-2 py-1">{{ h or '(ריק)' }}</th>{% endfor %}</tr>
+          </thead>
+          <tbody>
+            {% for row in preview %}
+            <tr>{% for h in headers %}<td dir="auto" class="px-2 py-1">{{ row.get(h,'') }}</td>{% endfor %}</tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="d-flex gap-2 justify-content-end">
+    <a href="{{ url_for('students_import') }}" class="btn btn-outline-secondary">חזרה</a>
+    <button type="submit" class="btn btn-success px-4">
+      <i class="bi bi-database-fill-add me-1"></i>ייבא
+    </button>
+  </div>
+</form>
+{% endif %}
+
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Show live column detection when user picks a file
+const fileInput = document.getElementById('excelFile');
+if (fileInput) {
+  fileInput.addEventListener('change', function () {
+    const file = this.files[0];
+    if (!file) return;
+    const form = new FormData();
+    form.append('excel_file', file);
+    fetch('{{ url_for("students_import_debug") }}', { method: 'POST', body: form })
+      .then(r => r.json())
+      .then(data => {
+        const box = document.getElementById('detectionResult');
+        const badges = document.getElementById('detectedBadges');
+        if (!box || !badges) return;
+        badges.innerHTML = '';
+        let anyMissed = false;
+        for (const [label, col] of Object.entries(data.auto_map)) {
+          const b = document.createElement('span');
+          if (col) {
+            b.className = 'badge bg-success-subtle text-success-emphasis border border-success';
+            b.innerHTML = `<i class="bi bi-check-lg"></i> ${label}: <em>${col}</em>`;
+          } else {
+            b.className = 'badge bg-light text-muted border';
+            b.innerHTML = `${label}: לא זוהה`;
+            anyMissed = true;
+          }
+          badges.appendChild(b);
+        }
+        box.style.display = 'block';
+      })
+      .catch(() => {});
+  });
+}
+</script>
+{% endblock %}

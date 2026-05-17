@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מערכת ייעוץ חינוכי</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+:root{--primary:#2B6CB0;--primary-dark:#1A4A8A;--accent:#276749;--bg:#F7FAFC;--sidebar:#1A365D;--sidebar-w:250px}
+*{box-sizing:border-box}
+body{font-family:'Segoe UI','Arial',sans-serif;background:var(--bg);color:#2D3748;margin:0;direction:rtl}
+/* Sidebar */
+.sidebar{position:fixed;top:0;right:0;width:var(--sidebar-w);height:100vh;background:var(--sidebar);color:#fff;z-index:1000;overflow-y:auto;display:flex;flex-direction:column}
+.sidebar-header{padding:20px 16px;border-bottom:1px solid rgba(255,255,255,.12)}
+.sidebar-logo{width:42px;height:42px;background:rgba(255,255,255,.15);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.sidebar-title{font-size:15px;font-weight:700}
+.sidebar-sub{font-size:11px;color:rgba(255,255,255,.55)}
+.sidebar-nav{padding:10px 8px;list-style:none;margin:0;flex:1}
+.sidebar-nav li{margin-bottom:2px}
+.sidebar-nav a{display:flex;align-items:center;gap:10px;padding:9px 13px;border-radius:8px;color:rgba(255,255,255,.80);font-size:13.5px;font-weight:500;text-decoration:none;transition:.2s;cursor:pointer}
+.sidebar-nav a:hover,.sidebar-nav a.active{background:rgba(255,255,255,.15);color:#fff}
+.sidebar-nav a.active{font-weight:700}
+.sidebar-nav a i{font-size:16px;flex-shrink:0}
+.sidebar-footer{padding:14px 16px;border-top:1px solid rgba(255,255,255,.12)}
+/* Main */
+.main{margin-right:var(--sidebar-w);min-height:100vh;display:flex;flex-direction:column}
+.topbar{height:56px;background:#fff;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.topbar-title{font-size:17px;font-weight:700;color:#1A365D}
+.page-content{padding:22px 24px;flex:1}
+/* Page visibility */
+.page{display:none}
+.page.active{display:block}
+/* Cards */
+.card{border:1px solid #E2E8F0;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.08);background:#fff}
+.card-header{background:#fff;border-bottom:1px solid #E2E8F0;padding:13px 18px;border-radius:10px 10px 0 0!important;font-size:14px;font-weight:600}
+/* Stat cards */
+.stat-card{border-radius:10px;padding:18px;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.13);transition:transform .2s}
+.stat-card:hover{transform:translateY(-2px)}
+.stat-blue{background:linear-gradient(135deg,#2B6CB0,#3182CE)}
+.stat-red{background:linear-gradient(135deg,#C53030,#E53E3E)}
+.stat-orange{background:linear-gradient(135deg,#C05621,#DD6B20)}
+.stat-green{background:linear-gradient(135deg,#276749,#38A169)}
+.stat-icon{font-size:24px;opacity:.85;margin-bottom:6px}
+.stat-value{font-size:32px;font-weight:800;line-height:1}
+.stat-label{font-size:12px;opacity:.90;margin-top:4px}
+/* Alert cards */
+.alert-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #F0F4F8;font-size:13px}
+.alert-item:last-child{border-bottom:none}
+/* Student cards */
+.student-card{background:#fff;border:1px solid #E2E8F0;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.07);overflow:hidden;transition:all .2s;border-right:4px solid #CBD5E0;cursor:pointer}
+.student-card:hover{box-shadow:0 4px 18px rgba(0,0,0,.13);transform:translateY(-2px)}
+.student-card.urgent{border-right-color:#E53E3E}
+.student-card.followup{border-right-color:#DD6B20}
+.student-card.active{border-right-color:#2B6CB0}
+.student-card.closed{border-right-color:#A0AEC0;opacity:.75}
+.student-card-header{display:flex;align-items:center;gap:11px;padding:13px 15px 9px}
+.avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#3182CE);color:#fff;font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.student-name-link{font-size:14px;font-weight:700;color:#1A365D;display:block}
+.student-class{font-size:12px;color:#718096;margin-top:1px}
+.student-card-body{padding:0 15px 10px;font-size:12px;color:#4A5568}
+.student-card-stats{display:flex;gap:12px;margin-top:7px;font-size:12px;color:#718096}
+.student-card-footer{display:flex;gap:7px;padding:9px 15px 13px;border-top:1px solid #F7FAFC}
+/* Profile header */
+.profile-header{background:linear-gradient(135deg,#1A365D,#2B6CB0);border-radius:10px;padding:22px;color:#fff;display:flex;align-items:center;gap:18px;box-shadow:0 4px 20px rgba(0,0,0,.15)}
+.profile-avatar{width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.20);font-size:28px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:3px solid rgba(255,255,255,.40)}
+.profile-name{font-size:22px;font-weight:800;margin:0 0 5px}
+.profile-meta{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;opacity:.85}
+/* Tabs */
+.profile-tabs .nav-link{color:#4A5568;font-size:13px;font-weight:500;border:none;border-bottom:3px solid transparent;padding:9px 16px;border-radius:0;transition:.2s}
+.profile-tabs .nav-link:hover{color:var(--primary);background:none}
+.profile-tabs .nav-link.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:700;background:none}
+/* Category badges */
+.cat-badge{display:inline-flex;align-items:center;background:#EBF8FF;color:#2B6CB0;border:1px solid #BEE3F8;border-radius:20px;padding:2px 9px;font-size:11px;font-weight:500;white-space:nowrap}
+/* Doc items */
+.doc-item{border:1px solid #E2E8F0;border-radius:8px;padding:13px 16px;margin-bottom:9px;border-right:4px solid #CBD5E0}
+.doc-item.high{border-right-color:#E53E3E}
+.doc-item.medium{border-right-color:#DD6B20}
+.doc-item.low{border-right-color:#38A169}
+/* Service cards */
+.service-card{background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,.07);border-right:4px solid #CBD5E0}
+.service-card.svc-active{border-right-color:#38A169}
+.service-card.svc-waiting{border-right-color:#DD6B20}
+/* Task items */
+.task-item{display:flex;align-items:flex-start;gap:12px;background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:12px 15px;box-shadow:0 2px 6px rgba(0,0,0,.06);margin-bottom:8px}
+.task-item.overdue{border-right:4px solid #E53E3E;background:#FFF5F5}
+.task-item.today{border-right:4px solid #DD6B20}
+/* Form styles */
+.categories-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;max-height:260px;overflow-y:auto}
+.category-check .form-check-label{font-size:13px;cursor:pointer}
+/* Search bar */
+.search-filter-bar{background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:14px 18px;margin-bottom:18px;box-shadow:0 2px 6px rgba(0,0,0,.06)}
+/* Login page */
+.login-page{min-height:100vh;background:linear-gradient(135deg,#1A365D 0%,#2B6CB0 60%,#3182CE 100%);display:flex;align-items:center;justify-content:center}
+.login-card{background:#fff;border-radius:16px;padding:38px 34px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.login-logo{width:60px;height:60px;background:linear-gradient(135deg,var(--primary),#3182CE);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;margin:0 auto 14px}
+/* Demo banner */
+.demo-banner{background:#FFF3CD;border:1px solid #FFC107;border-radius:8px;padding:9px 14px;font-size:13px;margin-bottom:16px}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ LOGIN PAGE ═══════════════════ -->
+<div id="login-screen" style="display:flex;min-height:100vh;background:linear-gradient(135deg,#1A365D 0%,#2B6CB0 60%,#3182CE 100%);align-items:center;justify-content:center">
+  <div class="login-card">
+    <div class="login-logo"><i class="bi bi-mortarboard-fill"></i></div>
+    <h2 style="text-align:center;font-size:21px;font-weight:800;color:#1A365D;margin-bottom:4px">מערכת ייעוץ חינוכי</h2>
+    <p style="text-align:center;color:#718096;font-size:13px;margin-bottom:22px">כניסה מאובטחת למערכת</p>
+    <div class="mb-3">
+      <label class="form-label fw-semibold">שם משתמש</label>
+      <input id="login-user" type="text" class="form-control" value="admin" dir="ltr">
+    </div>
+    <div class="mb-3">
+      <label class="form-label fw-semibold">סיסמה</label>
+      <input id="login-pass" type="password" class="form-control" value="counselor2024" dir="ltr">
+    </div>
+    <button class="btn btn-primary w-100 py-2 fw-semibold" onclick="doLogin()">
+      <i class="bi bi-box-arrow-in-right me-2"></i>כניסה למערכת
+    </button>
+    <p style="text-align:center;margin-top:16px;font-size:12px;color:#718096">
+      <i class="bi bi-shield-lock me-1"></i>מערכת מאובטחת — גישה מורשית בלבד
+    </p>
+  </div>
+</div>
+
+<!-- ═══════════════════ APP SHELL ═══════════════════ -->
+<div id="app-shell" style="display:none">
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="sidebar-header">
+    <div class="d-flex align-items-center gap-2">
+      <div class="sidebar-logo"><i class="bi bi-mortarboard-fill"></i></div>
+      <div>
+        <div class="sidebar-title">מערכת ייעוץ</div>
+        <div class="sidebar-sub">בית ספר יסודי</div>
+      </div>
+    </div>
+  </div>
+  <ul class="sidebar-nav">
+    <li><a onclick="showPage('dashboard')" id="nav-dashboard" class="active"><i class="bi bi-house-fill"></i>לוח בקרה</a></li>
+    <li><a onclick="showPage('students')" id="nav-students"><i class="bi bi-people-fill"></i>תלמידים</a></li>
+    <li><a onclick="showPage('profile')" id="nav-profile"><i class="bi bi-person-badge-fill"></i>תיק תלמיד</a></li>
+    <li><a onclick="showPage('documentation')" id="nav-documentation"><i class="bi bi-journal-text"></i>הוסף תיעוד</a></li>
+    <li><a onclick="showPage('services')" id="nav-services"><i class="bi bi-heart-pulse-fill"></i>שירותי תמיכה</a></li>
+    <li><a onclick="showPage('reminders')" id="nav-reminders"><i class="bi bi-bell-fill"></i>תזכורות <span class="badge bg-danger ms-auto">3</span></a></li>
+    <li><a onclick="showPage('reports')" id="nav-reports"><i class="bi bi-bar-chart-fill"></i>דוחות</a></li>
+    <li><a onclick="showPage('settings')" id="nav-settings"><i class="bi bi-gear-fill"></i>הגדרות</a></li>
+  </ul>
+  <div class="sidebar-footer">
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <i class="bi bi-person-circle" style="font-size:26px;color:rgba(255,255,255,.70)"></i>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#fff">יועצת בית הספר</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.55)">מנהל מערכת</div>
+      </div>
+    </div>
+    <a href="#" onclick="doLogout()" style="display:flex;align-items:center;gap:7px;color:rgba(255,255,255,.65);font-size:12px;text-decoration:none">
+      <i class="bi bi-box-arrow-right"></i>התנתק
+    </a>
+  </div>
+</nav>
+
+<!-- Main content -->
+<div class="main">
+  <div class="topbar">
+    <span class="topbar-title" id="page-title">לוח בקרה</span>
+    <div class="d-flex gap-2 align-items-center" id="topbar-actions"></div>
+  </div>
+  <div class="page-content">
+
+<!-- ═══ DASHBOARD PAGE ═══ -->
+<div class="page active" id="page-dashboard">
+  <div class="demo-banner"><i class="bi bi-info-circle me-1"></i><strong>מצב הדגמה</strong> — נתונים לדוגמה בלבד. להפעלה מלאה עם בסיס נתונים: התקן Python והפעל <code>python app.py</code></div>
+
+  <!-- Stat cards row -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="stat-card stat-blue">
+        <div class="stat-icon"><i class="bi bi-people-fill"></i></div>
+        <div class="stat-value">338</div>
+        <div class="stat-label">סה"כ תלמידים</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card stat-red">
+        <div class="stat-icon"><i class="bi bi-exclamation-circle-fill"></i></div>
+        <div class="stat-value">7</div>
+        <div class="stat-label">מקרים דחופים</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card stat-orange">
+        <div class="stat-icon"><i class="bi bi-clock-history"></i></div>
+        <div class="stat-value">14</div>
+        <div class="stat-label">במעקב</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-card stat-green">
+        <div class="stat-icon"><i class="bi bi-calendar-check-fill"></i></div>
+        <div class="stat-value">5</div>
+        <div class="stat-label">פגישות השבוע</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts + Alerts row -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header"><i class="bi bi-pie-chart-fill text-primary me-2"></i>סטטוס תלמידים</div>
+        <div class="card-body d-flex align-items-center justify-content-center" style="min-height:200px">
+          <canvas id="statusChart" style="max-height:200px"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header"><i class="bi bi-bar-chart-fill text-primary me-2"></i>תיעודים לפי חודש</div>
+        <div class="card-body d-flex align-items-center" style="min-height:200px">
+          <canvas id="docsChart" style="max-height:200px;width:100%"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header"><i class="bi bi-bell-fill text-danger me-2"></i>התראות ומשימות</div>
+        <div class="card-body p-0" style="font-size:13px">
+          <div class="alert-item"><span class="badge bg-danger me-1">דחוף</span> מנצור עיין — מעקב דחוף</div>
+          <div class="alert-item"><span class="badge bg-warning text-dark me-1">היום</span> שיחה עם הורי עבד אל חי</div>
+          <div class="alert-item"><span class="badge bg-warning text-dark me-1">מחר</span> ועדה רב מקצועית — ז'1</div>
+          <div class="alert-item"><span class="badge bg-secondary me-1">באיחור</span> פניה לקב"ס — 3 ימים</div>
+          <div class="alert-item"><span class="badge bg-info me-1">תזכורת</span> עדכון תלמידי חינוך מיוחד</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Service stats -->
+  <div class="card mb-4">
+    <div class="card-header"><i class="bi bi-heart-pulse-fill text-success me-2"></i>שירותי תמיכה — סקירה כללית</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-6 col-md-3 col-lg" style="text-align:center">
+          <div style="font-size:13px;font-weight:700;color:#2B6CB0">סל אישי</div>
+          <div style="font-size:28px;font-weight:800;color:#1A365D">23</div>
+          <div style="font-size:11px;color:#718096">תלמידים</div>
+        </div>
+        <div class="col-6 col-md-3 col-lg" style="text-align:center">
+          <div style="font-size:13px;font-weight:700;color:#276749">חינוך מיוחד</div>
+          <div style="font-size:28px;font-weight:800;color:#1A365D">15</div>
+          <div style="font-size:11px;color:#718096">תלמידים</div>
+        </div>
+        <div class="col-6 col-md-3 col-lg" style="text-align:center">
+          <div style="font-size:13px;font-weight:700;color:#C05621">מת"א</div>
+          <div style="font-size:28px;font-weight:800;color:#1A365D">19</div>
+          <div style="font-size:11px;color:#718096">תלמידים</div>
+        </div>
+        <div class="col-6 col-md-3 col-lg" style="text-align:center">
+          <div style="font-size:13px;font-weight:700;color:#C53030">רווחה</div>
+          <div style="font-size:28px;font-weight:800;color:#1A365D">8</div>
+          <div style="font-size:11px;color:#718096">תלמידים</div>
+        </div>
+        <div class="col-6 col-md-3 col-lg" style="text-align:center">
+          <div style="font-size:13px;font-weight:700;color:#553C9A">קב"ס</div>
+          <div style="font-size:28px;font-weight:800;color:#1A365D">5</div>
+          <div style="font-size:11px;color:#718096">תלמידים</div>
+        </div>
+        <div class="col-6 col-md-3 col-lg" style="text-align:center">
+          <div style="font-size:13px;font-weight:700;color:#2B6CB0">גפ"ן</div>
+          <div style="font-size:28px;font-weight:800;color:#1A365D">12</div>
+          <div style="font-size:11px;color:#718096">תלמידים</div>
+        </div>
+        <div class="col-6 col-md-3 col-lg" style="text-align:center">
+          <div style="font-size:13px;font-weight:700;color:#276749">חדר חם</div>
+          <div style="font-size:28px;font-weight:800;color:#1A365D">9</div>
+          <div style="font-size:11px;color:#718096">תלמידים</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ STUDENTS PAGE ═══ -->
+<div class="page" id="page-students">
+  <!-- Search bar -->
+  <div class="search-filter-bar">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold mb-1">חיפוש תלמיד/ה</label>
+        <div class="input-group">
+          <input type="text" class="form-control" placeholder="שם תלמיד..." id="student-search" oninput="filterStudents()">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold mb-1">שכבה</label>
+        <select class="form-select" id="filter-grade" onchange="filterStudents()">
+          <option value="">הכל</option>
+          <option>ז׳</option><option>ח׳</option><option>ט׳</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold mb-1">כיתה</label>
+        <select class="form-select" id="filter-class" onchange="filterStudents()">
+          <option value="">הכל</option>
+          <option>ז'1</option><option>ז'2</option><option>ז'3</option><option>ז'4</option><option>ז'5</option>
+          <option>ח'1</option><option>ח'2</option><option>ח'3</option><option>ח'4</option><option>ח'5</option><option>ח'6</option><option>ח'7</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold mb-1">סטטוס</label>
+        <select class="form-select" id="filter-status" onchange="filterStudents()">
+          <option value="">הכל</option>
+          <option value="urgent">דחוף</option>
+          <option value="followup">במעקב</option>
+          <option value="active">פעיל</option>
+          <option value="closed">סגור</option>
+        </select>
+      </div>
+      <div class="col-md-2 d-flex gap-2">
+        <button class="btn btn-primary flex-fill" onclick="showPage('add-student')"><i class="bi bi-plus-lg"></i> הוסף</button>
+        <button class="btn btn-outline-secondary" onclick="document.getElementById('student-search').value='';document.getElementById('filter-grade').value='';document.getElementById('filter-class').value='';document.getElementById('filter-status').value='';filterStudents()">נקה</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="students-grid" class="row g-3"></div>
+</div>
+
+<!-- ═══ STUDENT PROFILE PAGE ═══ -->
+<div class="page" id="page-profile">
+  <!-- Profile header -->
+  <div class="profile-header mb-3">
+    <div class="profile-avatar" id="prof-avatar">מ</div>
+    <div style="flex:1">
+      <h2 class="profile-name" id="prof-name">מנצור עיין</h2>
+      <div class="profile-meta">
+        <span><i class="bi bi-mortarboard"></i> <span id="prof-class">ח'3</span></span>
+        <span><i class="bi bi-layers"></i> שכבה <span id="prof-grade">ח'</span></span>
+        <span><i class="bi bi-person"></i> <span id="prof-teacher">מחנכת: ד' שמחוב</span></span>
+      </div>
+    </div>
+    <div>
+      <span class="badge fs-6 mb-2 bg-warning" id="prof-status-badge">במעקב</span><br>
+      <div class="btn-group btn-group-sm">
+        <button class="btn btn-light btn-sm" onclick="showPage('documentation')"><i class="bi bi-plus-circle"></i> תיעוד</button>
+        <button class="btn btn-light btn-sm" onclick="alert('עריכה זמינה בגרסה המלאה')"><i class="bi bi-pencil"></i> עריכה</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <ul class="nav profile-tabs mb-3 border-bottom">
+    <li class="nav-item"><a class="nav-link active" onclick="switchTab('tab-info',this)">פרטים כלליים</a></li>
+    <li class="nav-item"><a class="nav-link" onclick="switchTab('tab-docs',this)">תיעוד (3)</a></li>
+    <li class="nav-item"><a class="nav-link" onclick="switchTab('tab-services',this)">שירותים (2)</a></li>
+    <li class="nav-item"><a class="nav-link" onclick="switchTab('tab-tasks',this)">משימות (2)</a></li>
+    <li class="nav-item"><a class="nav-link" onclick="switchTab('tab-files',this)">קבצים (0)</a></li>
+  </ul>
+
+  <!-- Tab: Info -->
+  <div id="tab-info">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">פרטי תלמיד/ה</div>
+          <div class="card-body">
+            <table class="table table-borderless mb-0" style="font-size:13.5px">
+              <tr><th style="width:40%;color:#718096;font-weight:600">שם מלא</th><td id="pi-name" dir="auto">مناصرة عيان</td></tr>
+              <tr><th style="color:#718096;font-weight:600">כיתה</th><td id="pi-class">ח'3</td></tr>
+              <tr><th style="color:#718096;font-weight:600">שכבה</th><td id="pi-grade">ח'</td></tr>
+              <tr><th style="color:#718096;font-weight:600">מגדר</th><td>נקבה</td></tr>
+              <tr><th style="color:#718096;font-weight:600">תאריך לידה</th><td>22/08/2012</td></tr>
+              <tr><th style="color:#718096;font-weight:600">מחנכ/ת</th><td id="pi-teacher">ד' שמחוב</td></tr>
+              <tr><th style="color:#718096;font-weight:600">סטטוס</th><td><span class="badge bg-warning">במעקב</span></td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card mb-3">
+          <div class="card-header">פרטי הורים</div>
+          <div class="card-body">
+            <div style="background:#F7FAFC;border-radius:8px;padding:12px 14px;margin-bottom:10px">
+              <div style="font-size:11px;font-weight:700;color:#718096;margin-bottom:3px">הורה 1</div>
+              <div style="font-size:14px;font-weight:600;color:#1A365D" dir="auto">منصور سنا (אמא)</div>
+              <a href="tel:0523708147" style="font-size:13px;color:var(--primary);text-decoration:none;display:block;margin-top:3px" dir="ltr"><i class="bi bi-telephone-fill me-1"></i>052-370-8147</a>
+            </div>
+            <div style="background:#F7FAFC;border-radius:8px;padding:12px 14px">
+              <div style="font-size:11px;font-weight:700;color:#718096;margin-bottom:3px">הורה 2</div>
+              <div style="font-size:14px;font-weight:600;color:#1A365D" dir="auto">منصور لوسيان (אבא)</div>
+              <a href="tel:0522731100" style="font-size:13px;color:var(--primary);text-decoration:none;display:block;margin-top:3px" dir="ltr"><i class="bi bi-telephone-fill me-1"></i>052-273-1100</a>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">הערות כלליות</div>
+          <div class="card-body" style="font-size:13px;color:#4A5568">
+            תלמידה שקטה, קשיים חברתיים עם חברות הכיתה. במעקב מתחילת השנה. שיחות עם המחנכת מסייעות.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Documentation -->
+  <div id="tab-docs" style="display:none">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h6 class="fw-bold mb-0">היסטוריית תיעוד</h6>
+      <button class="btn btn-primary btn-sm" onclick="showPage('documentation')"><i class="bi bi-plus-lg"></i> תיעוד חדש</button>
+    </div>
+    <div class="doc-item high mb-3">
+      <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+        <span class="badge bg-danger">דחוף</span>
+        <span class="cat-badge">קושי חברתי</span>
+        <span class="cat-badge">מעקב יועצת</span>
+        <span class="text-muted small ms-auto">12/05/2026</span>
+      </div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:5px">סיכום: תלמידה מדווחת על בדידות חברתית חמורה, קשיי שינה.</div>
+      <div style="font-size:12px;color:#4A5568"><strong>צעדים הבאים:</strong> תיאום עם מחנכת, שיחה עם הורים.</div>
+      <div style="font-size:12px;color:#718096;margin-top:4px"><strong>מעקב:</strong> 20/05/2026 <strong class="ms-2">משתתפים:</strong> תלמידה, יועצת</div>
+    </div>
+    <div class="doc-item medium mb-3">
+      <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+        <span class="badge bg-warning text-dark">בינוני</span>
+        <span class="cat-badge">מפגש עם הורים</span>
+        <span class="cat-badge">שיחה עם מחנכת</span>
+        <span class="text-muted small ms-auto">28/04/2026</span>
+      </div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:5px">שיחה עם אמא בטלפון, דיון על קשיי ההסתגלות.</div>
+      <div style="font-size:12px;color:#4A5568"><strong>החלטות:</strong> הגברת מעקב שבועי, פגישת הורים פנים אל פנים.</div>
+    </div>
+    <div class="doc-item low mb-3">
+      <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+        <span class="badge bg-success">נמוך</span>
+        <span class="cat-badge">שיחה אישית עם תלמיד</span>
+        <span class="text-muted small ms-auto">10/04/2026</span>
+      </div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:5px">שיחה ראשונית עם התלמידה — הכרות והערכה ראשונית.</div>
+    </div>
+  </div>
+
+  <!-- Tab: Services -->
+  <div id="tab-services" style="display:none">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h6 class="fw-bold mb-0">שירותי תמיכה</h6>
+      <button class="btn btn-success btn-sm" onclick="alert('זמין בגרסה המלאה')"><i class="bi bi-plus-lg"></i> הוסף שירות</button>
+    </div>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="service-card svc-active">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span style="font-size:14px;font-weight:700;color:#1A365D">שיחות אישיות עם יועצת</span>
+            <span class="badge bg-success">פעיל</span>
+          </div>
+          <div style="font-size:13px;color:#4A5568;display:flex;flex-direction:column;gap:3px">
+            <span><i class="bi bi-calendar3 me-1"></i>התחיל: 10/04/2026</span>
+            <span><i class="bi bi-arrow-repeat me-1"></i>תדירות: שבועי</span>
+            <span><i class="bi bi-person me-1"></i>אחראי/ת: יועצת</span>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="service-card svc-waiting">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span style="font-size:14px;font-weight:700;color:#1A365D">טיפול קבוצתי</span>
+            <span class="badge bg-warning text-dark">ממתין</span>
+          </div>
+          <div style="font-size:13px;color:#4A5568;display:flex;flex-direction:column;gap:3px">
+            <span><i class="bi bi-calendar3 me-1"></i>מתוכנן: 01/06/2026</span>
+            <span><i class="bi bi-arrow-repeat me-1"></i>תדירות: דו-שבועי</span>
+            <span><i class="bi bi-person me-1"></i>אחראי/ת: גפ"ן</span>
+            <span class="mt-1 text-muted" style="font-size:12px">ממתין לאישור הורים</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Tasks -->
+  <div id="tab-tasks" style="display:none">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h6 class="fw-bold mb-0">משימות מעקב</h6>
+      <button class="btn btn-warning btn-sm" onclick="alert('זמין בגרסה המלאה')"><i class="bi bi-plus-lg"></i> הוסף משימה</button>
+    </div>
+    <div class="task-item overdue">
+      <div style="color:#E53E3E;font-size:20px;flex-shrink:0"><i class="bi bi-clock-history"></i></div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:600">שיחת מעקב עם התלמידה — שבוע לאחר הוועדה</div>
+        <div style="font-size:12px;color:#718096;margin-top:3px"><i class="bi bi-calendar3 me-1"></i>היה לבצע: 20/05/2026 <span class="badge bg-danger ms-2">באיחור</span></div>
+      </div>
+    </div>
+    <div class="task-item" style="margin-top:8px">
+      <div style="color:#DD6B20;font-size:20px;flex-shrink:0"><i class="bi bi-calendar-event"></i></div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:600">תיאום פגישת הורים פנים אל פנים</div>
+        <div style="font-size:12px;color:#718096;margin-top:3px"><i class="bi bi-calendar3 me-1"></i>יעד: 01/06/2026 <span class="badge bg-warning text-dark ms-2">בקרוב</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Files -->
+  <div id="tab-files" style="display:none">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h6 class="fw-bold mb-0">קבצים מצורפים</h6>
+      <button class="btn btn-secondary btn-sm" onclick="alert('העלאת קבצים זמינה בגרסה המלאה')"><i class="bi bi-upload"></i> העלה קובץ</button>
+    </div>
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-folder2-open" style="font-size:48px;opacity:.3"></i>
+      <p class="mt-3">אין קבצים מצורפים לתלמיד/ה זו</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ADD DOCUMENTATION PAGE ═══ -->
+<div class="page" id="page-documentation">
+  <div class="card">
+    <div class="card-header"><i class="bi bi-journal-plus text-primary me-2"></i>הוספת תיעוד חדש</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">תלמיד/ה</label>
+          <select class="form-select" id="doc-student">
+            <option>— בחר תלמיד/ה —</option>
+            <option selected>مناصرة عيان — ח'3</option>
+            <option>التيتي غزل — ח'5</option>
+            <option>عبد الحي محمد — ח'5</option>
+            <option>قشوع عدن — ח'5</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">תאריך</label>
+          <input type="date" class="form-control" dir="ltr" id="doc-date">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">דחיפות</label>
+          <select class="form-select" id="doc-urgency">
+            <option value="low">נמוך</option>
+            <option value="medium" selected>בינוני</option>
+            <option value="high">גבוה — דחוף</option>
+          </select>
+        </div>
+
+        <!-- Categories -->
+        <div class="col-12">
+          <label class="form-label fw-semibold">סוג תיעוד / קטגוריות</label>
+          <div class="mb-1 d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleAll(true)">בחר הכל</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleAll(false)">בטל הכל</button>
+          </div>
+          <div class="categories-grid" id="cats-grid"></div>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">משתתפים</label>
+          <div class="d-flex flex-wrap gap-3">
+            <div class="form-check"><input class="form-check-input" type="checkbox" checked><label class="form-check-label">תלמיד/ה</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox"><label class="form-check-label">הורים</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox"><label class="form-check-label">מחנכ/ת</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" checked><label class="form-check-label">יועצת</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox"><label class="form-check-label">גורם חיצוני</label></div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">תאריך מעקב</label>
+          <input type="date" class="form-control" dir="ltr" id="doc-followup">
+        </div>
+
+        <div class="col-12">
+          <label class="form-label fw-semibold">סיכום הפגישה / שיחה</label>
+          <textarea class="form-control" rows="3" placeholder="תאר את מהלך הפגישה, עיקרי הדברים שעלו..."></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">חששות / בעיות שעלו</label>
+          <textarea class="form-control" rows="2" placeholder="מה עלה כנושא מדאיג?"></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">החלטות שהתקבלו</label>
+          <textarea class="form-control" rows="2" placeholder="מה הוחלט בסיום הפגישה?"></textarea>
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">צעדים הבאים</label>
+          <textarea class="form-control" rows="2" placeholder="פרט את הצעדים הבאים ואחראי ביצועם..."></textarea>
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">קבצים מצורפים</label>
+          <input type="file" class="form-control" multiple>
+          <small class="text-muted">PDF, Word, תמונות — עד 16MB לקובץ</small>
+        </div>
+        <div class="col-12 d-flex gap-2 justify-content-end">
+          <button class="btn btn-outline-secondary" onclick="showPage('profile')">ביטול</button>
+          <button class="btn btn-primary px-4" onclick="saveDemoDoc()"><i class="bi bi-check-lg me-1"></i>שמור תיעוד</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SERVICES PAGE ═══ -->
+<div class="page" id="page-services">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-heart-pulse-fill text-success me-2"></i>שירותי תמיכה — סקירה כוללת</span>
+      <button class="btn btn-success btn-sm" onclick="alert('זמין בגרסה המלאה')"><i class="bi bi-plus-lg"></i> הוסף שירות</button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-dark">
+          <tr><th>תלמיד/ה</th><th>כיתה</th><th>שירות</th><th>סטטוס</th><th>תחילה</th><th>תדירות</th><th>אחראי/ת</th><th></th></tr>
+        </thead>
+        <tbody style="font-size:13px">
+          <tr><td dir="auto">مناصرة عيان</td><td>ח'3</td><td><span class="cat-badge">שיחות אישיות</span></td><td><span class="badge bg-success">פעיל</span></td><td>10/04/2026</td><td>שבועי</td><td>יועצת</td><td><button class="btn btn-outline-primary btn-sm" onclick="showPage('profile')"><i class="bi bi-folder2-open"></i></button></td></tr>
+          <tr><td dir="auto">التيتي غزل</td><td>ח'5</td><td><span class="cat-badge">סל אישי</span></td><td><span class="badge bg-success">פעיל</span></td><td>01/09/2025</td><td>קבוע</td><td>מת"א</td><td><button class="btn btn-outline-primary btn-sm" onclick="showPage('profile')"><i class="bi bi-folder2-open"></i></button></td></tr>
+          <tr><td dir="auto">عبد الحي محمد</td><td>ח'5</td><td><span class="cat-badge">קב"ס</span></td><td><span class="badge bg-warning text-dark">ממתין</span></td><td>—</td><td>לפי הצורך</td><td>קב"ס</td><td><button class="btn btn-outline-primary btn-sm" onclick="showPage('profile')"><i class="bi bi-folder2-open"></i></button></td></tr>
+          <tr><td dir="auto">قشوع عدن</td><td>ח'5</td><td><span class="cat-badge">חדר חם</span></td><td><span class="badge bg-success">פעיל</span></td><td>15/01/2026</td><td>שבועי</td><td>חדר חם</td><td><button class="btn btn-outline-primary btn-sm" onclick="showPage('profile')"><i class="bi bi-folder2-open"></i></button></td></tr>
+          <tr><td dir="auto">منصور غالي</td><td>ח'5</td><td><span class="cat-badge">מת"א</span></td><td><span class="badge bg-success">פעיל</span></td><td>01/09/2025</td><td>חודשי</td><td>מת"א</td><td><button class="btn btn-outline-primary btn-sm" onclick="showPage('profile')"><i class="bi bi-folder2-open"></i></button></td></tr>
+          <tr><td dir="auto">سماره نای</td><td>ח'5</td><td><span class="cat-badge">גפ"ן</span></td><td><span class="badge bg-info text-dark">מסתיים</span></td><td>01/02/2026</td><td>שבועי</td><td>גפ"ן</td><td><button class="btn btn-outline-primary btn-sm" onclick="showPage('profile')"><i class="bi bi-folder2-open"></i></button></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ REMINDERS PAGE ═══ -->
+<div class="page" id="page-reminders">
+  <!-- Summary -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-4"><div class="stat-card stat-red"><div class="stat-icon"><i class="bi bi-clock-history"></i></div><div class="stat-value">3</div><div class="stat-label">משימות באיחור</div></div></div>
+    <div class="col-md-4"><div class="stat-card stat-orange"><div class="stat-icon"><i class="bi bi-calendar-week"></i></div><div class="stat-value">4</div><div class="stat-label">השבוע הקרוב</div></div></div>
+    <div class="col-md-4"><div class="stat-card stat-blue"><div class="stat-icon"><i class="bi bi-calendar3"></i></div><div class="stat-value">7</div><div class="stat-label">בהמשך</div></div></div>
+  </div>
+
+  <!-- Overdue -->
+  <div class="card mb-3 border-danger">
+    <div class="card-header bg-danger text-white">
+      <i class="bi bi-exclamation-circle-fill me-2"></i>משימות באיחור (3)
+    </div>
+    <div class="card-body p-0">
+      <div class="alert-item"><span class="badge bg-danger me-2">3 ימים</span> <strong onclick="showPage('profile')" style="cursor:pointer">מנצור עיין</strong><span class="text-muted"> — ח'3 — </span>שיחת מעקב לאחר ועדה <span class="text-muted small ms-auto">היה: 13/05/2026</span></div>
+      <div class="alert-item"><span class="badge bg-danger me-2">5 ימים</span> <strong>עבד אל חי מחמד</strong><span class="text-muted"> — ח'5 — </span>תיאום עם קב"ס <span class="text-muted small ms-auto">היה: 11/05/2026</span></div>
+      <div class="alert-item"><span class="badge bg-danger me-2">7 ימים</span> <strong>קאסם זינה</strong><span class="text-muted"> — ח'5 — </span>שיחה עם הורים <span class="text-muted small ms-auto">היה: 09/05/2026</span></div>
+    </div>
+  </div>
+
+  <!-- Upcoming -->
+  <div class="card mb-3 border-warning">
+    <div class="card-header bg-warning">
+      <i class="bi bi-calendar-week-fill me-2"></i>השבוע הקרוב (4)
+    </div>
+    <div class="card-body p-0">
+      <div class="alert-item"><span class="badge bg-warning text-dark me-2">היום</span> <strong>מנצור עיין</strong><span class="text-muted"> — </span>שיחת הורים <span class="text-muted small ms-auto">16/05/2026</span></div>
+      <div class="alert-item"><span class="badge bg-warning text-dark me-2">מחר</span> <strong>ועדה רב מקצועית ז'1</strong><span class="text-muted"> — </span>תאום עם כל הגורמים <span class="text-muted small ms-auto">17/05/2026</span></div>
+      <div class="alert-item"><span class="badge bg-secondary me-2">19/05</span> <strong>תיתי כרים</strong><span class="text-muted"> — ח'5 — </span>מעקב לאחר שיחה <span class="text-muted small ms-auto">19/05/2026</span></div>
+      <div class="alert-item"><span class="badge bg-secondary me-2">20/05</span> <strong>נאצר שדה</strong><span class="text-muted"> — ח'5 — </span>עדכון המחנכת <span class="text-muted small ms-auto">20/05/2026</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ REPORTS PAGE ═══ -->
+<div class="page" id="page-reports">
+  <div class="card mb-4">
+    <div class="card-header"><i class="bi bi-funnel-fill text-primary me-2"></i>סינון דוחות</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-3"><label class="form-label small fw-semibold">שכבה</label><select class="form-select"><option value="">כל השכבות</option><option>ז'</option><option>ח'</option><option>ט'</option></select></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold">כיתה</label><select class="form-select"><option>כל הכיתות</option><option>ז'1</option><option>ז'2</option><option>ז'3</option><option>ח'1</option><option>ח'5</option></select></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold">סטטוס</label><select class="form-select"><option>כל הסטטוסים</option><option>דחוף</option><option>במעקב</option><option>פעיל</option><option>סגור</option></select></div>
+        <div class="col-md-3"><label class="form-label small fw-semibold">סוג שירות</label><select class="form-select"><option>כל השירותים</option><option>סל אישי</option><option>חינוך מיוחד</option><option>מת"א</option><option>רווחה</option><option>קב"ס</option><option>גפ"ן</option></select></div>
+        <div class="col-12 d-flex justify-content-between align-items-center">
+          <div class="d-flex gap-2">
+            <button class="btn btn-success btn-sm" onclick="alert('ייצוא Excel זמין בגרסה המלאה עם Python')"><i class="bi bi-file-excel-fill me-1"></i>ייצוא Excel</button>
+            <button class="btn btn-danger btn-sm" onclick="alert('ייצוא PDF זמין בגרסה המלאה עם Python')"><i class="bi bi-file-pdf-fill me-1"></i>ייצוא PDF</button>
+          </div>
+          <button class="btn btn-primary px-4">הצג תוצאות</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-table text-primary me-2"></i>תוצאות</span>
+      <span class="badge bg-primary">6 תלמידים</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0" style="font-size:13px">
+        <thead class="table-dark">
+          <tr><th>#</th><th>שם תלמיד</th><th>כיתה</th><th>שכבה</th><th>סטטוס</th><th>תיעודים</th><th>משימות פתוחות</th><th>שירותים</th><th></th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td dir="auto" class="fw-semibold">مناصرة عيان</td><td>ח'3</td><td>ח'</td><td><span class="badge bg-warning">במעקב</span></td><td>3</td><td><span class="badge bg-warning text-dark">2</span></td><td><span class="cat-badge">שיחות אישיות</span></td><td><button class="btn btn-outline-primary btn-sm" onclick="showPage('profile')"><i class="bi bi-folder2-open"></i></button></td></tr>
+          <tr><td>2</td><td dir="auto" class="fw-semibold">التيتي غزل</td><td>ח'5</td><td>ח'</td><td><span class="badge bg-primary">פעיל</span></td><td>1</td><td>—</td><td><span class="cat-badge">סל אישי</span></td><td><button class="btn btn-outline-primary btn-sm" onclick="showPage('profile')"><i class="bi bi-folder2-open"></i></button></td></tr>
+          <tr><td>3</td><td dir="auto" class="fw-semibold">عبد الحي محمد</td><td>ח'5</td><td>ח'</td><td><span class="badge bg-danger">דחוף</span></td><td>2</td><td><span class="badge bg-danger">3</span></td><td><span class="cat-badge">קב"ס</span></td><td><button class="btn btn-outline-primary btn-sm" onclick="showPage('profile')"><i class="bi bi-folder2-open"></i></button></td></tr>
+          <tr><td>4</td><td dir="auto" class="fw-semibold">قشوع عدن</td><td>ח'5</td><td>ח'</td><td><span class="badge bg-warning">במעקב</span></td><td>1</td><td><span class="badge bg-warning text-dark">1</span></td><td><span class="cat-badge">חדר חם</span></td><td><button class="btn btn-outline-primary btn-sm" onclick="showPage('profile')"><i class="bi bi-folder2-open"></i></button></td></tr>
+          <tr><td>5</td><td dir="auto" class="fw-semibold">منصور غالي</td><td>ח'5</td><td>ח'</td><td><span class="badge bg-primary">פעיל</span></td><td>0</td><td>—</td><td><span class="cat-badge">מת"א</span></td><td><button class="btn btn-outline-primary btn-sm" onclick="showPage('profile')"><i class="bi bi-folder2-open"></i></button></td></tr>
+          <tr><td>6</td><td dir="auto" class="fw-semibold">سماره نای</td><td>ח'5</td><td>ח'</td><td><span class="badge bg-secondary">סגור</span></td><td>2</td><td>—</td><td><span class="cat-badge">גפ"ן</span></td><td><button class="btn btn-outline-primary btn-sm" onclick="showPage('profile')"><i class="bi bi-folder2-open"></i></button></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ADD STUDENT PAGE ═══ -->
+<div class="page" id="page-add-student">
+  <div class="card">
+    <div class="card-header"><i class="bi bi-person-plus-fill text-primary me-2"></i>הוספת תלמיד/ה חדש/ה</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6"><label class="form-label fw-semibold">שם מלא</label><input type="text" class="form-control" dir="auto" placeholder="שם מלא (עברית/ערבית)"></div>
+        <div class="col-md-3"><label class="form-label fw-semibold">שכבה</label><select class="form-select"><option>ז'</option><option selected>ח'</option><option>ט'</option></select></div>
+        <div class="col-md-3"><label class="form-label fw-semibold">כיתה</label><select class="form-select"><option>ז'1</option><option>ז'2</option><option>ח'1</option><option selected>ח'3</option><option>ח'5</option></select></div>
+        <div class="col-md-4"><label class="form-label fw-semibold">מחנכ/ת</label><input type="text" class="form-control" placeholder="שם המחנכ/ת"></div>
+        <div class="col-md-4"><label class="form-label fw-semibold">תאריך לידה</label><input type="date" class="form-control" dir="ltr"></div>
+        <div class="col-md-4"><label class="form-label fw-semibold">מגדר</label><select class="form-select"><option value="נ">נקבה</option><option value="ז">זכר</option></select></div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">שם הורה 1</label>
+          <input type="text" class="form-control" dir="auto" placeholder="שם הורה ראשון">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">טלפון הורה 1</label>
+          <input type="tel" class="form-control" dir="ltr" placeholder="05X-XXXXXXX">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">שם הורה 2</label>
+          <input type="text" class="form-control" dir="auto" placeholder="שם הורה שני">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">טלפון הורה 2</label>
+          <input type="tel" class="form-control" dir="ltr" placeholder="05X-XXXXXXX">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">סטטוס</label>
+          <select class="form-select">
+            <option value="active" selected>פעיל</option>
+            <option value="followup">במעקב</option>
+            <option value="urgent">דחוף</option>
+            <option value="closed">סגור</option>
+          </select>
+        </div>
+        <div class="col-12"><label class="form-label fw-semibold">הערות</label><textarea class="form-control" rows="3" placeholder="הערות כלליות על התלמיד/ה..."></textarea></div>
+        <div class="col-12 d-flex gap-2 justify-content-end">
+          <button class="btn btn-outline-secondary" onclick="showPage('students')">ביטול</button>
+          <button class="btn btn-primary px-4" onclick="showPage('students')"><i class="bi bi-check-lg me-1"></i>שמור תלמיד</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SETTINGS PAGE ═══ -->
+<div class="page" id="page-settings">
+  <div class="row g-4">
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header"><i class="bi bi-info-circle-fill text-primary me-2"></i>סטטיסטיקות מערכת</div>
+        <div class="card-body">
+          <table class="table table-borderless mb-0" style="font-size:13.5px">
+            <tr><th style="color:#718096;font-weight:600">תלמידים</th><td><strong>338</strong></td></tr>
+            <tr><th style="color:#718096;font-weight:600">תיעודים</th><td><strong>3</strong></td></tr>
+            <tr><th style="color:#718096;font-weight:600">משימות</th><td><strong>7</strong></td></tr>
+            <tr><th style="color:#718096;font-weight:600">גרסת אפליקציה</th><td><strong>Demo 1.0</strong></td></tr>
+          </table>
+        </div>
+      </div>
+      <div class="card mt-3">
+        <div class="card-header"><i class="bi bi-shield-lock-fill text-success me-2"></i>אבטחה</div>
+        <div class="card-body">
+          <p class="text-muted small mb-2">שינוי סיסמה (הדגמה בלבד)</p>
+          <input type="password" class="form-control form-control-sm mb-2" placeholder="סיסמה חדשה" dir="ltr">
+          <button class="btn btn-outline-success btn-sm w-100"><i class="bi bi-key-fill me-1"></i>שנה סיסמה</button>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center"><span><i class="bi bi-people-fill text-primary me-2"></i>ניהול משתמשים</span><button class="btn btn-primary btn-sm"><i class="bi bi-person-plus-fill"></i> הוסף</button></div>
+        <table class="table table-hover align-middle mb-0" style="font-size:13px">
+          <thead class="table-light"><tr><th>שם מלא</th><th>שם משתמש</th><th>תפקיד</th><th>סטטוס</th><th>פעולות</th></tr></thead>
+          <tbody>
+            <tr><td class="fw-semibold">יועצת בית הספר</td><td dir="ltr">admin</td><td><span class="badge bg-primary">מנהל</span></td><td><span class="badge bg-success">פעיל</span></td><td><button class="btn btn-outline-secondary btn-sm"><i class="bi bi-key"></i></button></td></tr>
+            <tr><td class="fw-semibold">גורם חיצוני</td><td dir="ltr">viewer</td><td><span class="badge bg-secondary">צפייה בלבד</span></td><td><span class="badge bg-success">פעיל</span></td><td><div class="d-flex gap-1"><button class="btn btn-outline-secondary btn-sm"><i class="bi bi-key"></i></button><button class="btn btn-outline-danger btn-sm"><i class="bi bi-person-slash"></i></button></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card mt-3">
+        <div class="card-header"><i class="bi bi-question-circle-fill text-info me-2"></i>מדריך שימוש</div>
+        <div class="card-body" style="font-size:13px">
+          <div class="alert alert-warning mb-3">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+            <strong>גרסת הדגמה</strong> — נתונים לא נשמרים. להפעלה מלאה עם בסיס נתונים:
+            <ol class="mb-0 mt-2">
+              <li>הורד Python מ-<a href="https://python.org/downloads" target="_blank">python.org</a> (סמן "Add to PATH")</li>
+              <li>פתח Command Prompt בתיקיית <code>school_counselor</code></li>
+              <li>הפעל: <code>pip install -r requirements.txt</code></li>
+              <li>הפעל: <code>python import_data.py</code> — ייבוא ~338 תלמידים</li>
+              <li>הפעל: <code>python app.py</code> — פתח <a href="http://localhost:5000" target="_blank">localhost:5000</a></li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  </div><!-- end page-content -->
+</div><!-- end main -->
+</div><!-- end app-shell -->
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ── Sample students data ──────────────────────────────────────────────
+const STUDENTS = [
+  {name:'مناصرة عيان', cls:'ח\'3', grade:'ח\'', status:'followup', teacher:'ד\' שמחוב', docs:3, tasks:2},
+  {name:'التيتي غزل', cls:'ח\'5', grade:'ח\'', status:'active', teacher:'מ\' כהן', docs:1, tasks:0},
+  {name:'التيتي كريم', cls:'ח\'5', grade:'ח\'', status:'active', teacher:'מ\' כהן', docs:0, tasks:0},
+  {name:'عبد الحي محمد', cls:'ח\'5', grade:'ח\'', status:'urgent', teacher:'מ\' כהן', docs:2, tasks:3},
+  {name:'قشوع عدن', cls:'ח\'5', grade:'ח\'', status:'followup', teacher:'מ\' כהן', docs:1, tasks:1},
+  {name:'منصور غالي', cls:'ח\'5', grade:'ח\'', status:'active', teacher:'מ\' כהן', docs:0, tasks:0},
+  {name:'سماره نای', cls:'ח\'5', grade:'ח\'', status:'closed', teacher:'מ\' כהן', docs:2, tasks:0},
+  {name:'ناصر شذى', cls:'ח\'5', grade:'ח\'', status:'followup', teacher:'מ\' כהן', docs:1, tasks:1},
+  {name:'خاسكية سالي', cls:'ח\'5', grade:'ח\'', status:'active', teacher:'מ\' כהן', docs:0, tasks:0},
+  {name:'فضيلي محمد', cls:'ח\'5', grade:'ח\'', status:'active', teacher:'מ\' כהן', docs:1, tasks:0},
+  {name:'ابو حامد اسينات', cls:'ז\'1', grade:'ז\'', status:'active', teacher:'ר\' לוי', docs:0, tasks:0},
+  {name:'ابو حمدان لمار', cls:'ז\'1', grade:'ז\'', status:'followup', teacher:'ר\' לוי', docs:1, tasks:1},
+  {name:'ابو خيط لور', cls:'ז\'1', grade:'ז\'', status:'active', teacher:'ר\' לוי', docs:0, tasks:0},
+  {name:'القاسم يوسف', cls:'ז\'2', grade:'ז\'', status:'active', teacher:'נ\' אבו', docs:0, tasks:0},
+  {name:'البدوي سارة', cls:'ז\'3', grade:'ז\'', status:'urgent', teacher:'ש\' גולד', docs:3, tasks:2},
+];
+
+const STATUS_MAP = {urgent:{label:'דחוף',badge:'danger',card:'urgent'},followup:{label:'במעקב',badge:'warning',card:'followup'},active:{label:'פעיל',badge:'primary',card:'active'},closed:{label:'סגור',badge:'secondary',card:'closed'}};
+const CATEGORIES = ['שיחה אישית עם תלמיד','מפגש עם הורים','שיחה עם מחנכת','שיחה עם מורה מקצועי','ועדה רב מקצועית','תלמיד עם סל אישי','תלמיד חינוך מיוחד','טיפולים דרך מת״א','התערבות קב״ס','התערבות עו״ס / רווחה','טיפולים דרך גפ״ן','חדר חם','מעקב יועצת','קושי רגשי','קושי חברתי','קושי לימודי','היעדרויות','התנהגות מאתגרת','פנייה לגורם חיצוני','אחר'];
+
+// ── Login ─────────────────────────────────────────────────────────────
+function doLogin(){
+  const u=document.getElementById('login-user').value;
+  const p=document.getElementById('login-pass').value;
+  if((u==='admin'&&p==='counselor2024')||(u==='viewer'&&p==='view2024')){
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app-shell').style.display='block';
+    initCharts();
+    buildStudentGrid(STUDENTS);
+    buildCategoriesGrid();
+    setTodayDate();
+  } else {
+    alert('שם משתמש או סיסמה שגויים\nנסה: admin / counselor2024');
+  }
+}
+document.getElementById('login-pass').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin()});
+
+function doLogout(){
+  document.getElementById('app-shell').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+}
+
+// ── Page routing ──────────────────────────────────────────────────────
+const PAGE_TITLES={dashboard:'לוח בקרה',students:'רשימת תלמידים',profile:'תיק תלמיד',documentation:'הוספת תיעוד','add-student':'הוספת תלמיד/ה',services:'שירותי תמיכה',reminders:'תזכורות ומשימות',reports:'דוחות וסינון',settings:'הגדרות מערכת'};
+
+function showPage(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  const el=document.getElementById('page-'+name);
+  if(el)el.classList.add('active');
+  document.querySelectorAll('.sidebar-nav a').forEach(a=>a.classList.remove('active'));
+  const nav=document.getElementById('nav-'+name);
+  if(nav)nav.classList.add('active');
+  document.getElementById('page-title').textContent=PAGE_TITLES[name]||name;
+}
+
+// ── Tab switching (profile) ───────────────────────────────────────────
+function switchTab(tabId,link){
+  ['tab-info','tab-docs','tab-services','tab-tasks','tab-files'].forEach(id=>{
+    document.getElementById(id).style.display='none';
+  });
+  document.getElementById(tabId).style.display='block';
+  document.querySelectorAll('.profile-tabs .nav-link').forEach(l=>l.classList.remove('active'));
+  link.classList.add('active');
+}
+
+// ── Student grid ──────────────────────────────────────────────────────
+function buildStudentGrid(students){
+  const grid=document.getElementById('students-grid');
+  if(!grid)return;
+  grid.innerHTML=students.map(s=>{
+    const st=STATUS_MAP[s.status]||{label:s.status,badge:'secondary',card:''};
+    const initials=getInitials(s.name);
+    return `<div class="col-sm-6 col-md-4 col-lg-3">
+      <div class="student-card ${st.card}" onclick="openProfile('${s.name}','${s.cls}','${s.grade}','${s.teacher}','${s.status}')">
+        <div class="student-card-header">
+          <div class="avatar">${initials}</div>
+          <div style="flex:1;min-width:0">
+            <span class="student-name-link" dir="auto">${s.name}</span>
+            <div class="student-class">${s.cls} | שכבה ${s.grade}</div>
+          </div>
+          <span class="badge bg-${st.badge}" style="font-size:10px;flex-shrink:0">${st.label}</span>
+        </div>
+        <div class="student-card-body">
+          <div><i class="bi bi-person-fill" style="font-size:11px;margin-left:4px"></i>${s.teacher||'—'}</div>
+          <div class="student-card-stats">
+            <span><i class="bi bi-journal-text"></i> ${s.docs} תיעודים</span>
+            ${s.tasks>0?`<span><i class="bi bi-bell-fill text-warning"></i> ${s.tasks} משימות</span>`:''}
+          </div>
+        </div>
+        <div class="student-card-footer">
+          <button class="btn btn-outline-primary btn-sm flex-fill" onclick="event.stopPropagation();openProfile('${s.name}','${s.cls}','${s.grade}','${s.teacher}','${s.status}')"><i class="bi bi-folder2-open"></i> תיק</button>
+          <button class="btn btn-outline-success btn-sm flex-fill" onclick="event.stopPropagation();showPage('documentation')"><i class="bi bi-plus-circle"></i> תעד</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function getInitials(name){
+  const words=name.trim().split(/\s+/);
+  if(words.length>=2)return words[0][0]+(words[1][0]||'');
+  return words[0]?words[0][0]:'?';
+}
+
+function openProfile(name,cls,grade,teacher,status){
+  document.getElementById('prof-name').textContent=name;
+  document.getElementById('prof-avatar').textContent=getInitials(name);
+  document.getElementById('prof-class').textContent=cls;
+  document.getElementById('prof-grade').textContent=grade;
+  document.getElementById('prof-teacher').textContent='מחנכת: '+teacher;
+  const st=STATUS_MAP[status]||{label:status,badge:'secondary'};
+  const badge=document.getElementById('prof-status-badge');
+  badge.textContent=st.label;
+  badge.className='badge fs-6 mb-2 bg-'+st.badge;
+  document.getElementById('pi-name').textContent=name;
+  document.getElementById('pi-class').textContent=cls;
+  document.getElementById('pi-grade').textContent=grade;
+  document.getElementById('pi-teacher').textContent=teacher;
+  // reset to first tab
+  switchTab('tab-info',document.querySelector('.profile-tabs .nav-link'));
+  showPage('profile');
+}
+
+function filterStudents(){
+  const q=(document.getElementById('student-search').value||'').toLowerCase();
+  const grade=document.getElementById('filter-grade').value;
+  const cls=document.getElementById('filter-class').value;
+  const status=document.getElementById('filter-status').value;
+  const filtered=STUDENTS.filter(s=>{
+    if(q&&!s.name.toLowerCase().includes(q))return false;
+    if(grade&&s.grade!==grade)return false;
+    if(cls&&s.cls!==cls)return false;
+    if(status&&s.status!==status)return false;
+    return true;
+  });
+  buildStudentGrid(filtered);
+}
+
+// ── Categories grid ───────────────────────────────────────────────────
+function buildCategoriesGrid(){
+  const grid=document.getElementById('cats-grid');
+  if(!grid)return;
+  grid.innerHTML=CATEGORIES.map((c,i)=>`
+    <div class="form-check category-check">
+      <input class="form-check-input cat-cb" type="checkbox" id="cat${i}">
+      <label class="form-check-label" for="cat${i}">${c}</label>
+    </div>`).join('');
+}
+
+function toggleAll(val){
+  document.querySelectorAll('.cat-cb').forEach(cb=>cb.checked=val);
+}
+
+function setTodayDate(){
+  const today=new Date().toISOString().split('T')[0];
+  const dd=document.getElementById('doc-date');
+  if(dd)dd.value=today;
+}
+
+function saveDemoDoc(){
+  alert('בגרסת ההדגמה הנתונים לא נשמרים.\nבגרסה המלאה (Python) — התיעוד יישמר במסד הנתונים, משימת המעקב תיווצר אוטומטית, וניתן יהיה לייצא לאקסל ו-PDF.');
+  showPage('profile');
+}
+
+// ── Dashboard Charts ──────────────────────────────────────────────────
+function initCharts(){
+  Chart.defaults.font.family="'Segoe UI','Arial',sans-serif";
+
+  // Status donut
+  new Chart(document.getElementById('statusChart'),{
+    type:'doughnut',
+    data:{
+      labels:['פעיל','במעקב','דחוף','סגור'],
+      datasets:[{data:[317,14,7,0],backgroundColor:['#2B6CB0','#DD6B20','#E53E3E','#A0AEC0'],borderWidth:2,borderColor:'#fff'}]
+    },
+    options:{responsive:true,plugins:{legend:{position:'bottom',rtl:true}},cutout:'65%'}
+  });
+
+  // Docs per month
+  new Chart(document.getElementById('docsChart'),{
+    type:'bar',
+    data:{
+      labels:['ינו','פבר','מרץ','אפר','מאי','יוני'],
+      datasets:[{label:'תיעודים',data:[12,19,8,24,31,18],backgroundColor:'rgba(43,108,176,.75)',borderColor:'#2B6CB0',borderWidth:1,borderRadius:6}]
+    },
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0}},x:{grid:{display:false}}}}
+  });
+}
+
+// Enter key on login
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&document.getElementById('login-screen').style.display!=='none'){doLogin();}
+});
+</script>
+</body>
+</html>

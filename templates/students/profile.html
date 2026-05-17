@@ -1,0 +1,625 @@
+{% extends 'base.html' %}
+{% block title %}{{ student.full_name }} — מערכת ייעוץ{% endblock %}
+{% block page_title %}תיק תלמיד{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('students_list') }}" class="btn btn-outline-secondary btn-sm">
+  <i class="bi bi-arrow-right"></i> חזרה לרשימה
+</a>
+{% if current_user.is_admin %}
+<a href="{{ url_for('student_edit', student_id=student.id) }}" class="btn btn-outline-primary btn-sm">
+  <i class="bi bi-pencil"></i> ערוך פרטים
+</a>
+<a href="{{ url_for('documentation_add', student_id=student.id) }}" class="btn btn-primary btn-sm">
+  <i class="bi bi-journal-plus"></i> הוסף תיעוד
+</a>
+<a href="{{ url_for('student_print', student_id=student.id) }}"
+   target="printwin" class="btn btn-outline-secondary btn-sm">
+  <i class="bi bi-printer"></i> הדפסה
+</a>
+<a href="{{ url_for('student_export_pdf', student_id=student.id) }}"
+   class="btn btn-outline-secondary btn-sm">
+  <i class="bi bi-file-earmark-pdf"></i> הורד PDF
+</a>
+<button type="button" class="btn btn-outline-danger btn-sm"
+        data-bs-toggle="modal" data-bs-target="#deleteStudentModal">
+  <i class="bi bi-trash3"></i> מחק תלמיד
+</button>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<!-- Student Header Card -->
+<div class="student-header-card mb-4">
+  <div class="student-header-avatar">{{ student.full_name[0] if student.full_name else '?' }}</div>
+  <div class="student-header-info">
+    <h2 class="student-header-name" dir="auto">{{ student.full_name }}</h2>
+    <div class="student-header-meta">
+      <span><i class="bi bi-mortarboard"></i> {{ student.class_name }}</span>
+      <span><i class="bi bi-layers"></i> שכבה {{ student.grade_level }}</span>
+      {% if student.homeroom_teacher %}
+      <span><i class="bi bi-person"></i> {{ student.homeroom_teacher }}</span>
+      {% endif %}
+      {% if student.dob %}
+      <span><i class="bi bi-calendar3"></i> {{ student.dob.strftime('%d/%m/%Y') }}</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="student-header-status">
+    <span class="badge bg-{{ student.status_color }} fs-6 mb-2" id="status-badge">{{ student.status_label }}</span>
+    {% if current_user.is_admin %}
+    <div class="dropdown">
+      <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+        שנה סטטוס
+      </button>
+      <ul class="dropdown-menu">
+        <li><a class="dropdown-item status-change-btn" href="#" data-student-id="{{ student.id }}" data-status="active">פעיל</a></li>
+        <li><a class="dropdown-item status-change-btn" href="#" data-student-id="{{ student.id }}" data-status="followup">במעקב</a></li>
+        <li><a class="dropdown-item status-change-btn" href="#" data-student-id="{{ student.id }}" data-status="urgent">דחוף</a></li>
+        <li><a class="dropdown-item status-change-btn" href="#" data-student-id="{{ student.id }}" data-status="closed">סגור</a></li>
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs profile-tabs mb-4" id="profileTabs">
+  <li class="nav-item">
+    <a class="nav-link active" data-bs-toggle="tab" href="#tab-info">
+      <i class="bi bi-person-vcard"></i> פרטים אישיים
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" data-bs-toggle="tab" href="#tab-documentation">
+      <i class="bi bi-journal-text"></i> תיעוד
+      <span class="badge bg-primary ms-1">{{ docs | length }}</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" data-bs-toggle="tab" href="#tab-services">
+      <i class="bi bi-heart-pulse"></i> שירותי תמיכה
+      <span class="badge bg-success ms-1">{{ services | length }}</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" data-bs-toggle="tab" href="#tab-tasks">
+      <i class="bi bi-list-check"></i> משימות ומעקב
+      {% set open_tasks = tasks | selectattr('is_completed', 'equalto', false) | list %}
+      {% if open_tasks | length > 0 %}
+      <span class="badge bg-warning text-dark ms-1">{{ open_tasks | length }}</span>
+      {% endif %}
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" data-bs-toggle="tab" href="#tab-files">
+      <i class="bi bi-paperclip"></i> קבצים
+      <span class="badge bg-secondary ms-1">{{ attachments | length }}</span>
+    </a>
+  </li>
+</ul>
+
+<div class="tab-content">
+
+  <!-- Tab: Personal Info -->
+  <div class="tab-pane fade show active" id="tab-info">
+    <div class="row g-4">
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-header fw-semibold"><i class="bi bi-person-fill text-primary me-2"></i>פרטי תלמיד</div>
+          <div class="card-body">
+            <table class="table table-borderless info-table">
+              <tr><th>שם מלא</th><td dir="auto">{{ student.full_name }}</td></tr>
+              <tr><th>כיתה</th><td>{{ student.class_name }}</td></tr>
+              <tr><th>שכבה</th><td>{{ student.grade_level }}</td></tr>
+              <tr><th>מגדר</th><td>{{ 'זכר' if student.gender == 'ז' else 'נקבה' if student.gender == 'נ' else '—' }}</td></tr>
+              <tr><th>מחנכ/ת</th><td>{{ student.homeroom_teacher or '—' }}</td></tr>
+              <tr><th>תאריך לידה</th><td>{{ student.dob.strftime('%d/%m/%Y') if student.dob else '—' }}</td></tr>
+              <tr><th>נוסף למערכת</th><td>{{ student.created_at.strftime('%d/%m/%Y') }}</td></tr>
+            </table>
+            {% if student.notes %}
+            <div class="mt-3">
+              <div class="fw-semibold mb-1 text-muted small">הערות כלליות:</div>
+              <div class="p-3 bg-light rounded small">{{ student.notes }}</div>
+            </div>
+            {% endif %}
+            {% if current_user.is_admin %}
+            <div class="mt-3">
+              <a href="{{ url_for('student_edit', student_id=student.id) }}" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-pencil"></i> ערוך פרטים
+              </a>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-header fw-semibold"><i class="bi bi-telephone-fill text-primary me-2"></i>פרטי קשר הורים</div>
+          <div class="card-body">
+            <div class="parent-contact-card mb-3">
+              <div class="parent-label">הורה 1</div>
+              <div class="parent-name" dir="auto">{{ student.parent1_name or '—' }}</div>
+              {% if student.parent1_phone %}
+              <a href="tel:{{ student.parent1_phone }}" class="parent-phone" dir="ltr">
+                <i class="bi bi-telephone"></i> {{ student.parent1_phone }}
+              </a>
+              {% endif %}
+            </div>
+            <div class="parent-contact-card">
+              <div class="parent-label">הורה 2</div>
+              <div class="parent-name" dir="auto">{{ student.parent2_name or '—' }}</div>
+              {% if student.parent2_phone %}
+              <a href="tel:{{ student.parent2_phone }}" class="parent-phone" dir="ltr">
+                <i class="bi bi-telephone"></i> {{ student.parent2_phone }}
+              </a>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Documentation -->
+  <div class="tab-pane fade" id="tab-documentation">
+    {% if current_user.is_admin %}
+    <div class="mb-3">
+      <a href="{{ url_for('documentation_add', student_id=student.id) }}" class="btn btn-primary">
+        <i class="bi bi-journal-plus"></i> הוסף תיעוד חדש
+      </a>
+    </div>
+    {% endif %}
+
+    {% if docs %}
+    <div class="accordion" id="docsAccordion">
+      {% for doc in docs %}
+      <div class="accordion-item doc-accordion-item urgency-{{ doc.urgency }}">
+        <h2 class="accordion-header">
+          <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button"
+                  data-bs-toggle="collapse" data-bs-target="#doc-{{ doc.id }}">
+            <div class="doc-summary-header w-100">
+              <div class="doc-header-top">
+                <span class="doc-date"><i class="bi bi-calendar3 me-1"></i>{{ doc.date.strftime('%d/%m/%Y') }}</span>
+                <span class="badge bg-{{ doc.urgency_color }}">{{ doc.urgency_label }}</span>
+              </div>
+              <div class="doc-categories-preview">
+                {% for cat in doc.categories_list[:3] %}
+                <span class="category-badge">{{ cat }}</span>
+                {% endfor %}
+                {% if doc.categories_list | length > 3 %}
+                <span class="category-badge text-muted">+{{ doc.categories_list | length - 3 }}</span>
+                {% endif %}
+              </div>
+              <div class="doc-summary-preview small text-muted">
+                {{ doc.summary[:80] }}{% if doc.summary | length > 80 %}...{% endif %}
+              </div>
+            </div>
+          </button>
+        </h2>
+        <div id="doc-{{ doc.id }}" class="accordion-collapse collapse {% if not loop.first %}{% else %}show{% endif %}">
+          <div class="accordion-body">
+            <div class="row g-3">
+              <div class="col-12">
+                <div class="fw-semibold text-muted small mb-1">קטגוריות:</div>
+                <div class="d-flex flex-wrap gap-1">
+                  {% for cat in doc.categories_list %}
+                  <span class="category-badge">{{ cat }}</span>
+                  {% endfor %}
+                </div>
+              </div>
+              {% if doc.participants %}
+              <div class="col-md-6">
+                <div class="fw-semibold text-muted small mb-1">משתתפים:</div>
+                <div>{{ doc.participants }}</div>
+              </div>
+              {% endif %}
+              <div class="col-12">
+                <div class="fw-semibold text-muted small mb-1">סיכום:</div>
+                <div class="doc-text-block">{{ doc.summary }}</div>
+              </div>
+              {% if doc.concerns %}
+              <div class="col-md-6">
+                <div class="fw-semibold text-muted small mb-1">חששות שעלו:</div>
+                <div class="doc-text-block">{{ doc.concerns }}</div>
+              </div>
+              {% endif %}
+              {% if doc.decisions %}
+              <div class="col-md-6">
+                <div class="fw-semibold text-muted small mb-1">החלטות:</div>
+                <div class="doc-text-block">{{ doc.decisions }}</div>
+              </div>
+              {% endif %}
+              {% if doc.next_steps %}
+              <div class="col-12">
+                <div class="fw-semibold text-muted small mb-1">צעדים הבאים:</div>
+                <div class="doc-text-block">{{ doc.next_steps }}</div>
+              </div>
+              {% endif %}
+              {% if doc.followup_date %}
+              <div class="col-md-6">
+                <div class="fw-semibold text-muted small mb-1">תאריך מעקב:</div>
+                <span class="badge bg-info text-dark">{{ doc.followup_date.strftime('%d/%m/%Y') }}</span>
+              </div>
+              {% endif %}
+            </div>
+            {% if current_user.is_admin %}
+            <div class="mt-3 d-flex gap-2">
+              <a href="{{ url_for('documentation_edit', doc_id=doc.id) }}" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-pencil"></i> ערוך
+              </a>
+              <button type="button" class="btn btn-sm btn-outline-danger"
+                      data-bs-toggle="modal" data-bs-target="#deleteDocModal{{ doc.id }}">
+                <i class="bi bi-trash3"></i> מחק
+              </button>
+            </div>
+
+            <!-- Delete documentation modal -->
+            <div class="modal fade" id="deleteDocModal{{ doc.id }}" tabindex="-1">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>מחיקת תיעוד</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body">
+                    <p>האם למחוק את התיעוד מתאריך <strong>{{ doc.date.strftime('%d/%m/%Y') }}</strong>?</p>
+                    <p class="text-muted small">פעולה זו תמחק גם את המשימות והקבצים המצורפים לתיעוד זה ולא ניתן לשחזרה.</p>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ביטול</button>
+                    <form method="POST" action="{{ url_for('documentation_delete', doc_id=doc.id) }}" class="d-inline">
+                      <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash3"></i> מחק תיעוד
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-journal-x display-3"></i>
+      <h5 class="mt-3">אין תיעוד עדיין</h5>
+      {% if current_user.is_admin %}
+      <a href="{{ url_for('documentation_add', student_id=student.id) }}" class="btn btn-primary mt-2">
+        <i class="bi bi-journal-plus"></i> הוסף תיעוד ראשון
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Tab: Support Services -->
+  <div class="tab-pane fade" id="tab-services">
+    {% if current_user.is_admin %}
+    <div class="mb-3">
+      <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addServiceModal">
+        <i class="bi bi-plus-lg"></i> הוסף שירות תמיכה
+      </button>
+    </div>
+    {% endif %}
+
+    {% if services %}
+    <div class="row g-3">
+      {% for svc in services %}
+      <div class="col-md-6">
+        <div class="service-card service-{{ svc.status }}">
+          <div class="service-card-header">
+            <span class="service-type-label">{{ svc.service_type }}</span>
+            <span class="badge bg-{{ svc.status_color }}">{{ svc.status_label }}</span>
+          </div>
+          <div class="service-details">
+            {% if svc.responsible_person %}<div><i class="bi bi-person text-muted"></i> {{ svc.responsible_person }}</div>{% endif %}
+            {% if svc.frequency %}<div><i class="bi bi-clock text-muted"></i> {{ svc.frequency }}</div>{% endif %}
+            {% if svc.start_date %}<div><i class="bi bi-calendar-check text-muted"></i> מ-{{ svc.start_date.strftime('%d/%m/%Y') }}</div>{% endif %}
+            {% if svc.notes %}<div class="service-notes text-muted small">{{ svc.notes }}</div>{% endif %}
+          </div>
+          {% if current_user.is_admin %}
+          <div class="service-actions d-flex gap-2 align-items-center flex-wrap">
+            <form method="POST" action="{{ url_for('service_status', svc_id=svc.id) }}" class="d-inline">
+              <select name="status" class="form-select form-select-sm d-inline w-auto" onchange="this.form.submit()">
+                <option value="active" {% if svc.status == 'active' %}selected{% endif %}>פעיל</option>
+                <option value="waiting" {% if svc.status == 'waiting' %}selected{% endif %}>ממתין</option>
+                <option value="finished" {% if svc.status == 'finished' %}selected{% endif %}>הסתיים</option>
+              </select>
+            </form>
+            <a href="{{ url_for('service_edit', svc_id=svc.id) }}" class="btn btn-sm btn-outline-primary">
+              <i class="bi bi-pencil"></i> ערוך
+            </a>
+            <button type="button" class="btn btn-sm btn-outline-danger"
+                    data-bs-toggle="modal" data-bs-target="#deleteSvcModal{{ svc.id }}">
+              <i class="bi bi-trash3"></i> מחק
+            </button>
+          </div>
+
+          <!-- Delete service modal -->
+          <div class="modal fade" id="deleteSvcModal{{ svc.id }}" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>מחיקת שירות תמיכה</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                  <p>האם למחוק את שירות <strong>{{ svc.service_type }}</strong>?</p>
+                  <p class="text-muted small">פעולה זו אינה ניתנת לשחזור.</p>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ביטול</button>
+                  <form method="POST" action="{{ url_for('service_delete', svc_id=svc.id) }}" class="d-inline">
+                    <button type="submit" class="btn btn-danger">
+                      <i class="bi bi-trash3"></i> מחק שירות
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-heart-pulse display-3"></i>
+      <h5 class="mt-3">אין שירותי תמיכה פעילים</h5>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Tab: Tasks -->
+  <div class="tab-pane fade" id="tab-tasks">
+    {% if current_user.is_admin %}
+    <div class="mb-3">
+      <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#addTaskModal">
+        <i class="bi bi-plus-lg"></i> הוסף משימת מעקב
+      </button>
+    </div>
+    {% endif %}
+
+    {% if tasks %}
+    <div class="tasks-list">
+      {% for task in tasks %}
+      <div class="task-item {% if task.is_completed %}task-completed{% elif task.is_overdue %}task-overdue{% endif %}">
+        <div class="task-check">
+          {% if not task.is_completed and current_user.is_admin %}
+          <button class="btn btn-sm btn-outline-success complete-task-btn rounded-circle"
+                  data-task-id="{{ task.id }}" title="סמן כהושלם">
+            <i class="bi bi-check-lg"></i>
+          </button>
+          {% elif task.is_completed %}
+          <div class="task-done-icon"><i class="bi bi-check-circle-fill text-success"></i></div>
+          {% endif %}
+        </div>
+        <div class="task-body">
+          <div class="task-description">{{ task.description }}</div>
+          <div class="task-meta">
+            <span class="{% if task.is_overdue %}text-danger fw-semibold{% else %}text-muted{% endif %}">
+              <i class="bi bi-calendar3"></i>
+              {% if task.is_overdue %}באיחור — {% endif %}
+              {{ task.due_date.strftime('%d/%m/%Y') }}
+            </span>
+            {% if task.is_completed and task.completed_at %}
+            <span class="text-success me-2">
+              <i class="bi bi-check-circle"></i> הושלם {{ task.completed_at.strftime('%d/%m/%Y') }}
+            </span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-list-check display-3"></i>
+      <h5 class="mt-3">אין משימות מעקב</h5>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Tab: Files -->
+  <div class="tab-pane fade" id="tab-files">
+    {% if current_user.is_admin %}
+    <div class="mb-3">
+      <form method="POST" action="{{ url_for('file_upload') }}" enctype="multipart/form-data" class="d-flex gap-2 align-items-center">
+        <input type="hidden" name="student_id" value="{{ student.id }}">
+        <input type="file" name="file" class="form-control" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls,.txt">
+        <button type="submit" class="btn btn-outline-primary text-nowrap">
+          <i class="bi bi-upload"></i> העלה קובץ
+        </button>
+      </form>
+      <small class="text-muted">סוגים מותרים: PDF, Word, Excel, תמונות, טקסט</small>
+    </div>
+    {% endif %}
+
+    {% if attachments %}
+    <div class="files-list">
+      {% for att in attachments %}
+      <div class="file-item d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-3">
+          <div class="file-icon">
+            {% if att.original_name.endswith(('.jpg','.jpeg','.png')) %}
+              <i class="bi bi-image text-info fs-4"></i>
+            {% elif att.original_name.endswith('.pdf') %}
+              <i class="bi bi-file-pdf text-danger fs-4"></i>
+            {% elif att.original_name.endswith(('.xlsx','.xls')) %}
+              <i class="bi bi-file-excel text-success fs-4"></i>
+            {% elif att.original_name.endswith(('.doc','.docx')) %}
+              <i class="bi bi-file-word text-primary fs-4"></i>
+            {% else %}
+              <i class="bi bi-file-text fs-4"></i>
+            {% endif %}
+          </div>
+          <div>
+            <div class="file-name">{{ att.original_name }}</div>
+            <div class="file-meta text-muted small">
+              {{ att.uploaded_at.strftime('%d/%m/%Y') }}
+              {% if att.file_size %}| {{ (att.file_size / 1024) | round(1) }} KB{% endif %}
+            </div>
+          </div>
+        </div>
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('file_download', att_id=att.id) }}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-download"></i>
+          </a>
+          {% if current_user.is_admin %}
+          <form method="POST" action="{{ url_for('file_delete', att_id=att.id) }}"
+                onsubmit="return confirm('למחוק את הקובץ?')">
+            <button type="submit" class="btn btn-sm btn-outline-danger">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-folder2 display-3"></i>
+      <h5 class="mt-3">אין קבצים מצורפים</h5>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Add Service Modal -->
+{% if current_user.is_admin %}
+<div class="modal fade" id="addServiceModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">הוספת שירות תמיכה</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('service_add') }}">
+        <div class="modal-body">
+          <input type="hidden" name="student_id" value="{{ student.id }}">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">סוג שירות</label>
+            <select name="service_type" class="form-select" required>
+              <option value="">בחר שירות</option>
+              {% for st in SERVICE_TYPES %}
+              <option value="{{ st }}">{{ st }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">תאריך התחלה</label>
+              <input type="date" name="start_date" class="form-control" dir="ltr">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">תדירות</label>
+              <input type="text" name="frequency" class="form-control" placeholder="לדוגמה: שבועי">
+            </div>
+          </div>
+          <div class="mb-3 mt-2">
+            <label class="form-label fw-semibold">אחראי/ת</label>
+            <input type="text" name="responsible_person" class="form-control" placeholder="שם האחראי/ת">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">סטטוס</label>
+            <select name="status" class="form-select">
+              <option value="active">פעיל</option>
+              <option value="waiting">ממתין</option>
+              <option value="finished">הסתיים</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">הערות</label>
+            <textarea name="notes" class="form-control" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">ביטול</button>
+          <button type="submit" class="btn btn-success">הוסף שירות</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Add Task Modal -->
+<div class="modal fade" id="addTaskModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">הוספת משימת מעקב</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('task_add') }}">
+        <div class="modal-body">
+          <input type="hidden" name="student_id" value="{{ student.id }}">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">תיאור המשימה</label>
+            <textarea name="description" class="form-control" rows="3" required
+                      placeholder="תאר את המשימה או הפעולה הנדרשת..."></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">תאריך יעד</label>
+            <input type="date" name="due_date" class="form-control" dir="ltr" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">ביטול</button>
+          <button type="submit" class="btn btn-warning">הוסף משימה</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<!-- Delete Student Modal -->
+<div class="modal fade" id="deleteStudentModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-danger">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill me-2"></i>מחיקת תלמיד</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="fw-semibold fs-5" dir="auto">{{ student.full_name }}</p>
+        <p>האם למחוק את התלמיד/ה מהמערכת? פעולה זו תמחק גם את כל התיעודים, השירותים והמשימות הקשורים ולא ניתן לשחזרה.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ביטול</button>
+        <form method="POST" action="{{ url_for('student_delete', student_id=student.id) }}" class="d-inline">
+          <button type="submit" class="btn btn-danger">
+            <i class="bi bi-trash3-fill"></i> מחק לצמיתות
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Activate correct tab from URL hash
+document.addEventListener('DOMContentLoaded', function() {
+  const hash = window.location.hash;
+  if (hash) {
+    const tabMap = {'#documentation': '#tab-documentation', '#services': '#tab-services',
+                    '#tasks': '#tab-tasks', '#files': '#tab-files'};
+    const targetId = tabMap[hash];
+    if (targetId) {
+      const tab = document.querySelector('[href="' + targetId + '"]');
+      if (tab) { new bootstrap.Tab(tab).show(); }
+    }
+  }
+});
+</script>
+{% endblock %}

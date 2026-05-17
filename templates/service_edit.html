@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% block title %}עריכת שירות תמיכה — מערכת ייעוץ{% endblock %}
+{% block page_title %}עריכת שירות תמיכה{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('student_profile', student_id=svc.student_id) }}#services"
+   class="btn btn-outline-secondary btn-sm">
+  <i class="bi bi-arrow-right"></i> חזרה לתיק תלמיד
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+
+    <div class="card mb-3">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-heart-pulse-fill text-success me-2"></i>
+        עריכת שירות עבור: <span dir="auto">{{ svc.student.full_name }}</span>
+        <span class="text-muted small me-2">({{ svc.student.class_name }})</span>
+      </div>
+      <div class="card-body">
+        <form method="POST">
+
+          <!-- Service Type -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold">סוג שירות <span class="text-danger">*</span></label>
+            <select name="service_type" class="form-select" required>
+              {% for st in SERVICE_TYPES %}
+              <option value="{{ st }}" {% if svc.service_type == st %}selected{% endif %}>{{ st }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Status -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold">סטטוס</label>
+            <select name="status" class="form-select">
+              {% for key, label in SERVICE_STATUS_LABELS.items() %}
+              <option value="{{ key }}" {% if svc.status == key %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Responsible Person -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold">אחראי/ת</label>
+            <input type="text" name="responsible_person" class="form-control"
+                   value="{{ svc.responsible_person or '' }}" placeholder="שם האחראי על השירות">
+          </div>
+
+          <!-- Frequency -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold">תדירות</label>
+            <input type="text" name="frequency" class="form-control"
+                   value="{{ svc.frequency or '' }}" placeholder="לדוג׳ שבועי, דו-שבועי...">
+          </div>
+
+          <!-- Dates -->
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">תאריך התחלה</label>
+              <input type="date" name="start_date" class="form-control" dir="ltr"
+                     value="{{ svc.start_date.strftime('%Y-%m-%d') if svc.start_date else '' }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">תאריך סיום</label>
+              <input type="date" name="end_date" class="form-control" dir="ltr"
+                     value="{{ svc.end_date.strftime('%Y-%m-%d') if svc.end_date else '' }}">
+            </div>
+          </div>
+
+          <!-- Notes -->
+          <div class="mb-4">
+            <label class="form-label fw-semibold">הערות</label>
+            <textarea name="notes" class="form-control" rows="3"
+                      placeholder="הערות נוספות...">{{ svc.notes or '' }}</textarea>
+          </div>
+
+          <!-- Buttons -->
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-lg"></i> שמור שינויים
+            </button>
+            <a href="{{ url_for('student_profile', student_id=svc.student_id) }}#services"
+               class="btn btn-outline-secondary">ביטול</a>
+          </div>
+
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>תיק תלמיד — {{ student.full_name }}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 13px;
+      color: #1A202C;
+      background: #fff;
+      direction: rtl;
+    }
+
+    /* ── Screen toolbar (hidden when printing) ── */
+    .no-print {
+      background: #2B6CB0;
+      color: #fff;
+      padding: 12px 24px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .no-print h1 { font-size: 15px; flex: 1; }
+    .no-print button {
+      background: #fff;
+      color: #2B6CB0;
+      border: none;
+      padding: 7px 18px;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .no-print .btn-close-tab {
+      background: rgba(255,255,255,0.15);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.4);
+    }
+
+    /* ── Page layout ── */
+    .page {
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 32px 36px;
+      background: #fff;
+    }
+
+    /* ── Header ── */
+    .doc-header {
+      border-bottom: 3px solid #2B6CB0;
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+    }
+    .doc-header .system-name {
+      font-size: 11px;
+      color: #718096;
+      margin-bottom: 6px;
+    }
+    .doc-header .student-name {
+      font-size: 26px;
+      font-weight: 700;
+      color: #2B6CB0;
+      margin-bottom: 4px;
+    }
+    .doc-header .student-meta {
+      font-size: 12px;
+      color: #4A5568;
+    }
+    .doc-header .student-meta span { margin-left: 16px; }
+    .status-badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .status-urgent  { background: #FED7D7; color: #C53030; }
+    .status-followup{ background: #FEEBC8; color: #C05621; }
+    .status-active  { background: #BEE3F8; color: #2B6CB0; }
+    .status-closed  { background: #EDF2F7; color: #718096; }
+
+    /* ── Section ── */
+    .section { margin-bottom: 24px; }
+    .section-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #2B6CB0;
+      border-right: 4px solid #2B6CB0;
+      padding-right: 8px;
+      margin-bottom: 12px;
+    }
+    .section-title.green { color: #276749; border-color: #276749; }
+    .section-title.orange { color: #C05621; border-color: #C05621; }
+
+    /* ── Info grid ── */
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px 16px;
+    }
+    .info-item { }
+    .info-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #718096;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 1px;
+    }
+    .info-value { font-size: 13px; }
+
+    /* ── Documentation entries ── */
+    .doc-entry {
+      border: 1px solid #E2E8F0;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      page-break-inside: avoid;
+    }
+    .doc-entry-header {
+      background: #EBF4FF;
+      padding: 6px 12px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      font-size: 12px;
+    }
+    .doc-entry-header .doc-date { font-weight: 700; color: #2B6CB0; }
+    .doc-entry-header .doc-urgency { font-weight: 600; }
+    .urgency-high   { color: #C53030; }
+    .urgency-medium { color: #C05621; }
+    .urgency-low    { color: #276749; }
+    .doc-cats { font-size: 11px; color: #4A5568; }
+    .doc-entry-body { padding: 10px 12px; }
+    .doc-field { margin-bottom: 6px; }
+    .doc-field-label { font-size: 10px; font-weight: 700; color: #718096; }
+    .doc-field-value { font-size: 12px; }
+    .doc-followup {
+      font-size: 11px;
+      color: #276749;
+      font-weight: 600;
+      margin-top: 6px;
+    }
+
+    /* ── Services table ── */
+    table.services-tbl {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    table.services-tbl th {
+      background: #276749;
+      color: #fff;
+      padding: 6px 10px;
+      text-align: right;
+      font-weight: 600;
+    }
+    table.services-tbl td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #E2E8F0;
+    }
+    table.services-tbl tr:nth-child(even) td { background: #F0FFF4; }
+
+    /* ── Tasks ── */
+    .task-row {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      padding: 6px 0;
+      border-bottom: 1px solid #E2E8F0;
+    }
+    .task-row:last-child { border-bottom: none; }
+    .task-bullet { color: #C05621; font-size: 14px; line-height: 1.3; }
+    .task-date-overdue { color: #C53030; font-weight: 700; }
+    .task-date-ok { color: #276749; }
+
+    /* ── Footer ── */
+    .doc-footer {
+      margin-top: 32px;
+      border-top: 1px solid #E2E8F0;
+      padding-top: 10px;
+      font-size: 10px;
+      color: #A0AEC0;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* ── Divider ── */
+    hr.section-hr {
+      border: none;
+      border-top: 1px solid #E2E8F0;
+      margin: 20px 0;
+    }
+
+    /* ── Print styles ── */
+    @media print {
+      .no-print { display: none !important; }
+      .page { margin: 0; padding: 16px 20px; max-width: 100%; }
+      body { font-size: 11px; }
+      .doc-entry { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Screen toolbar -->
+<div class="no-print">
+  <h1>תיק תלמיד — {{ student.full_name }}</h1>
+  <button onclick="window.print()">🖨️ הדפסה / שמור PDF</button>
+  <a href="{{ url_for('student_export_pdf', student_id=student.id) }}"
+     style="background:#fff;color:#2B6CB0;border:none;padding:7px 18px;border-radius:6px;font-family:inherit;font-size:13px;font-weight:700;text-decoration:none;display:inline-block;">
+    ⬇️ הורד PDF
+  </a>
+  <button class="btn-close-tab" onclick="window.close()">✕ סגור</button>
+</div>
+
+<div class="page">
+
+  <!-- ── Document Header ── -->
+  <div class="doc-header">
+    <div class="system-name">מערכת ייעוץ חינוכי | הופק: {{ now.strftime('%d/%m/%Y %H:%M') }}</div>
+    <div class="student-name" dir="auto">{{ student.full_name }}</div>
+    <div class="student-meta">
+      {% if student.class_name %}<span>📚 {{ student.class_name }}</span>{% endif %}
+      {% if student.grade_level %}<span>שכבה {{ student.grade_level }}</span>{% endif %}
+      {% if student.gender %}<span>{{ 'זכר' if student.gender == 'ז' else 'נקבה' }}</span>{% endif %}
+      {% if student.dob %}<span>📅 {{ student.dob.strftime('%d/%m/%Y') }}</span>{% endif %}
+      <span>
+        <span class="status-badge status-{{ student.status }}">
+          {{ {'active':'פעיל','followup':'במעקב','urgent':'דחוף','closed':'סגור'}.get(student.status, student.status) }}
+        </span>
+      </span>
+    </div>
+  </div>
+
+  <!-- ── Personal Details ── -->
+  <div class="section">
+    <div class="section-title">פרטים אישיים</div>
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">מחנך/ת</div>
+        <div class="info-value">{{ student.homeroom_teacher or '—' }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">הורה 1</div>
+        <div class="info-value" dir="auto">{{ student.parent1_name or '—' }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">טלפון הורה 1</div>
+        <div class="info-value" dir="ltr">{{ student.parent1_phone or '—' }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">הורה 2</div>
+        <div class="info-value" dir="auto">{{ student.parent2_name or '—' }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">טלפון הורה 2</div>
+        <div class="info-value" dir="ltr">{{ student.parent2_phone or '—' }}</div>
+      </div>
+      {% if student.notes %}
+      <div class="info-item">
+        <div class="info-label">הערות</div>
+        <div class="info-value">{{ student.notes }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <hr class="section-hr">
+
+  <!-- ── Statistics ── -->
+  <div class="section">
+    <div class="section-title">סיכום</div>
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">מספר תיעודים</div>
+        <div class="info-value" style="font-size:20px;font-weight:700;color:#2B6CB0;">{{ docs | length }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">שירותי תמיכה</div>
+        <div class="info-value" style="font-size:20px;font-weight:700;color:#276749;">{{ services | length }}</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">משימות פתוחות</div>
+        {% set open_tasks = tasks | selectattr('is_completed', 'equalto', false) | list %}
+        <div class="info-value" style="font-size:20px;font-weight:700;color:#C05621;">{{ open_tasks | length }}</div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="section-hr">
+
+  <!-- ── Documentation ── -->
+  <div class="section">
+    <div class="section-title">תיעוד ({{ docs | length }} רשומות)</div>
+
+    {% if docs %}
+      {% for doc in docs %}
+      <div class="doc-entry">
+        <div class="doc-entry-header">
+          <span class="doc-date">{{ doc.date.strftime('%d/%m/%Y') }}</span>
+          <span class="doc-urgency urgency-{{ doc.urgency }}">
+            {{ {'high':'⚠ דחוף','medium':'◉ בינוני','low':'○ רגיל'}.get(doc.urgency, '') }}
+          </span>
+          {% if doc.categories %}
+          <span class="doc-cats">{{ doc.categories | map(attribute='category_name') | join(' · ') }}</span>
+          {% endif %}
+          {% if doc.participants %}
+          <span style="color:#718096;">משתתפים: {{ doc.participants }}</span>
+          {% endif %}
+        </div>
+        <div class="doc-entry-body">
+          {% if doc.summary %}
+          <div class="doc-field">
+            <div class="doc-field-label">סיכום</div>
+            <div class="doc-field-value">{{ doc.summary }}</div>
+          </div>
+          {% endif %}
+          {% if doc.concerns %}
+          <div class="doc-field">
+            <div class="doc-field-label">קשיים / חששות</div>
+            <div class="doc-field-value">{{ doc.concerns }}</div>
+          </div>
+          {% endif %}
+          {% if doc.decisions %}
+          <div class="doc-field">
+            <div class="doc-field-label">החלטות</div>
+            <div class="doc-field-value">{{ doc.decisions }}</div>
+          </div>
+          {% endif %}
+          {% if doc.next_steps %}
+          <div class="doc-field">
+            <div class="doc-field-label">צעדים הבאים</div>
+            <div class="doc-field-value">{{ doc.next_steps }}</div>
+          </div>
+          {% endif %}
+          {% if doc.followup_date %}
+          <div class="doc-followup">📅 תאריך מעקב: {{ doc.followup_date.strftime('%d/%m/%Y') }}</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p style="color:#718096;">אין תיעוד עדיין.</p>
+    {% endif %}
+  </div>
+
+  <hr class="section-hr">
+
+  <!-- ── Support Services ── -->
+  <div class="section">
+    <div class="section-title green">שירותי תמיכה ({{ services | length }})</div>
+
+    {% if services %}
+    <table class="services-tbl">
+      <thead>
+        <tr>
+          <th>סוג שירות</th>
+          <th>סטטוס</th>
+          <th>אחראי/ת</th>
+          <th>תדירות</th>
+          <th>תאריך התחלה</th>
+          <th>תאריך סיום</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for svc in services %}
+        <tr>
+          <td><strong>{{ svc.service_type }}</strong></td>
+          <td>{{ {'active':'פעיל','waiting':'ממתין','finished':'הסתיים'}.get(svc.status, svc.status) }}</td>
+          <td dir="auto">{{ svc.responsible_person or '—' }}</td>
+          <td>{{ svc.frequency or '—' }}</td>
+          <td>{{ svc.start_date.strftime('%d/%m/%Y') if svc.start_date else '—' }}</td>
+          <td>{{ svc.end_date.strftime('%d/%m/%Y') if svc.end_date else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p style="color:#718096;">אין שירותי תמיכה.</p>
+    {% endif %}
+  </div>
+
+  <!-- ── Tasks ── -->
+  {% set open_tasks = tasks | selectattr('is_completed', 'equalto', false) | list %}
+  {% if open_tasks %}
+  <hr class="section-hr">
+  <div class="section">
+    <div class="section-title orange">משימות פתוחות ({{ open_tasks | length }})</div>
+    <div>
+      {% for task in open_tasks %}
+      {% set overdue = task.due_date < now.date() %}
+      <div class="task-row">
+        <span class="task-bullet">●</span>
+        <div>
+          <div>{{ task.description }}</div>
+          <div class="{{ 'task-date-overdue' if overdue else 'task-date-ok' }}">
+            {% if overdue %}⚠ באיחור — {% endif %}{{ task.due_date.strftime('%d/%m/%Y') }}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ── Footer ── -->
+  <div class="doc-footer">
+    <span>מערכת ייעוץ חינוכי</span>
+    <span>הופק: {{ now.strftime('%d/%m/%Y %H:%M') }}</span>
+    <span dir="auto">{{ student.full_name }} | {{ student.class_name }}</span>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+  // Auto-trigger print dialog only if opened as a dedicated print page
+  // (i.e. not embedded in an iframe or similar)
+  if (window.opener || window.name === 'printwin') {
+    window.addEventListener('load', function() {
+      setTimeout(function() { window.print(); }, 400);
+    });
+  }
+</script>
+
+</body>
+</html>

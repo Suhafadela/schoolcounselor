@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "מערכת ייעוץ",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "5500", "--directory", "C:\\Users\\WIN 11 HOME\\Documents\\school_counselor"],
+      "port": 5500
+    }
+  ]
+}

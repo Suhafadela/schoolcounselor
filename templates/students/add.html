@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'עריכת' if student else 'הוספת' }} תלמיד — מערכת ייעוץ{% endblock %}
+{% block page_title %}{{ 'עריכת פרטי תלמיד' if student else 'הוספת תלמיד חדש' }}{% endblock %}
+
+{% block topbar_actions %}
+{% if student %}
+<a href="{{ url_for('student_profile', student_id=student.id) }}" class="btn btn-outline-secondary btn-sm">
+  <i class="bi bi-arrow-right"></i> חזרה לתיק
+</a>
+{% else %}
+<a href="{{ url_for('students_list') }}" class="btn btn-outline-secondary btn-sm">
+  <i class="bi bi-arrow-right"></i> חזרה לרשימה
+</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-person-fill text-primary me-2"></i>
+        {{ 'עדכון פרטי תלמיד' if student else 'פרטי תלמיד חדש' }}
+      </div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('student_edit', student_id=student.id) if student else url_for('student_add') }}">
+
+          <div class="row g-3">
+            <!-- Name -->
+            <div class="col-12">
+              <label class="form-label fw-semibold">שם מלא <span class="text-danger">*</span></label>
+              <input type="text" name="full_name" class="form-control form-control-lg" dir="auto"
+                     value="{{ student.full_name if student else '' }}" required
+                     placeholder="שם פרטי ושם משפחה">
+            </div>
+
+            <!-- Class + Grade -->
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">כיתה <span class="text-danger">*</span></label>
+              <input type="text" name="class_name" class="form-control" dir="rtl"
+                     value="{{ student.class_name if student else '' }}"
+                     list="classes-list" required placeholder="לדוגמה: ז'1">
+              <datalist id="classes-list">
+                {% for c in classes %}
+                <option value="{{ c }}">
+                {% endfor %}
+              </datalist>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">שכבה <span class="text-danger">*</span></label>
+              <select name="grade_level" class="form-select" required>
+                <option value="">בחר שכבה</option>
+                <option value="ז" {% if student and student.grade_level == 'ז' %}selected{% endif %}>ז׳</option>
+                <option value="ח" {% if student and student.grade_level == 'ח' %}selected{% endif %}>ח׳</option>
+                <option value="ט" {% if student and student.grade_level == 'ט' %}selected{% endif %}>ט׳</option>
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">מגדר</label>
+              <select name="gender" class="form-select">
+                <option value="">לא צוין</option>
+                <option value="ז" {% if student and student.gender == 'ז' %}selected{% endif %}>זכר</option>
+                <option value="נ" {% if student and student.gender == 'נ' %}selected{% endif %}>נקבה</option>
+              </select>
+            </div>
+
+            <!-- Homeroom + DOB -->
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">מחנכ/ת</label>
+              <input type="text" name="homeroom_teacher" class="form-control"
+                     value="{{ student.homeroom_teacher or '' if student else '' }}"
+                     placeholder="שם המחנכ/ת">
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">תאריך לידה</label>
+              <input type="date" name="dob" class="form-control" dir="ltr"
+                     value="{{ student.dob.strftime('%Y-%m-%d') if student and student.dob else '' }}">
+            </div>
+
+            <!-- Parent 1 -->
+            <div class="col-12">
+              <div class="section-divider">הורה 1</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">שם הורה 1</label>
+              <input type="text" name="parent1_name" class="form-control" dir="auto"
+                     value="{{ student.parent1_name or '' if student else '' }}"
+                     placeholder="שם ותפקיד (אמא/אבא)">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">טלפון הורה 1</label>
+              <input type="tel" name="parent1_phone" class="form-control" dir="ltr"
+                     value="{{ student.parent1_phone or '' if student else '' }}"
+                     placeholder="05X-XXXXXXX">
+            </div>
+
+            <!-- Parent 2 -->
+            <div class="col-12">
+              <div class="section-divider">הורה 2</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">שם הורה 2</label>
+              <input type="text" name="parent2_name" class="form-control" dir="auto"
+                     value="{{ student.parent2_name or '' if student else '' }}"
+                     placeholder="שם ותפקיד (אמא/אבא)">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">טלפון הורה 2</label>
+              <input type="tel" name="parent2_phone" class="form-control" dir="ltr"
+                     value="{{ student.parent2_phone or '' if student else '' }}"
+                     placeholder="05X-XXXXXXX">
+            </div>
+
+            <!-- Status (edit only) -->
+            {% if student %}
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">סטטוס</label>
+              <select name="status" class="form-select">
+                <option value="active" {% if student.status == 'active' %}selected{% endif %}>פעיל</option>
+                <option value="followup" {% if student.status == 'followup' %}selected{% endif %}>במעקב</option>
+                <option value="urgent" {% if student.status == 'urgent' %}selected{% endif %}>דחוף</option>
+                <option value="closed" {% if student.status == 'closed' %}selected{% endif %}>סגור</option>
+              </select>
+            </div>
+            {% endif %}
+
+            <!-- Notes -->
+            <div class="col-12">
+              <label class="form-label fw-semibold">הערות כלליות</label>
+              <textarea name="notes" class="form-control" rows="3"
+                        placeholder="הערות כלליות על התלמיד...">{{ student.notes or '' if student else '' }}</textarea>
+            </div>
+          </div>
+
+          <div class="mt-4 d-flex gap-2 justify-content-end">
+            <a href="{{ url_for('student_profile', student_id=student.id) if student else url_for('students_list') }}"
+               class="btn btn-outline-secondary">ביטול</a>
+            <button type="submit" class="btn btn-primary px-4">
+              <i class="bi bi-check-lg"></i>
+              {{ 'שמור שינויים' if student else 'הוסף תלמיד' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

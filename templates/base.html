@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}מערכת ייעוץ חינוכי{% endblock %}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+{% if current_user.is_authenticated %}
+<!-- Sidebar -->
+<nav class="sidebar d-flex flex-column">
+  <div class="sidebar-header">
+    <div class="sidebar-logo">
+      <i class="bi bi-mortarboard-fill"></i>
+    </div>
+    <div>
+      <div class="sidebar-title">מערכת ייעוץ</div>
+      <div class="sidebar-subtitle">חינוכי</div>
+    </div>
+  </div>
+
+  <ul class="nav flex-column sidebar-nav flex-grow-1">
+    <li class="nav-item">
+      <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
+        <i class="bi bi-house-fill"></i>
+        <span>לוח בקרה</span>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if request.endpoint in ['students_list','student_profile','student_add','student_edit'] %}active{% endif %}"
+         href="{{ url_for('students_list') }}">
+        <i class="bi bi-people-fill"></i>
+        <span>תלמידים</span>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if 'documentation' in (request.endpoint or '') %}active{% endif %}"
+         href="{{ url_for('documentation_add') }}">
+        <i class="bi bi-journal-text"></i>
+        <span>הוסף תיעוד</span>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if request.endpoint == 'services_overview' %}active{% endif %}"
+         href="{{ url_for('services_overview') }}">
+        <i class="bi bi-heart-pulse-fill"></i>
+        <span>שירותי תמיכה</span>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if request.endpoint == 'reminders' %}active{% endif %}"
+         href="{{ url_for('reminders') }}">
+        <i class="bi bi-bell-fill"></i>
+        <span>תזכורות ומשימות</span>
+        {% if overdue_count > 0 %}
+        <span class="badge bg-danger ms-auto">{{ overdue_count }}</span>
+        {% endif %}
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if request.endpoint == 'reports' %}active{% endif %}"
+         href="{{ url_for('reports') }}">
+        <i class="bi bi-bar-chart-fill"></i>
+        <span>דוחות</span>
+      </a>
+    </li>
+    {% if current_user.is_admin %}
+    <li class="nav-item">
+      <a class="nav-link {% if request.endpoint == 'settings' %}active{% endif %}"
+         href="{{ url_for('settings') }}">
+        <i class="bi bi-gear-fill"></i>
+        <span>הגדרות</span>
+      </a>
+    </li>
+    {% endif %}
+  </ul>
+
+  <div class="sidebar-footer">
+    <div class="sidebar-user">
+      <i class="bi bi-person-circle"></i>
+      <div>
+        <div class="sidebar-user-name">{{ current_user.full_name }}</div>
+        <div class="sidebar-user-role">{{ 'מנהל' if current_user.is_admin else 'צפייה בלבד' }}</div>
+      </div>
+    </div>
+    <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-light w-100 mt-2">
+      <i class="bi bi-box-arrow-left"></i> יציאה
+    </a>
+  </div>
+</nav>
+
+<!-- Main Content -->
+<main class="main-content">
+  <!-- Top Bar -->
+  <div class="topbar">
+    <div class="topbar-title">{% block page_title %}{% endblock %}</div>
+    <div class="topbar-actions">{% block topbar_actions %}{% endblock %}</div>
+  </div>
+
+  <!-- Flash Messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-container">
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category if category in ['success','danger','warning','info'] else 'info' }} alert-dismissible fade show" role="alert">
+            {% if category == 'success' %}<i class="bi bi-check-circle-fill me-2"></i>
+            {% elif category == 'danger' %}<i class="bi bi-x-circle-fill me-2"></i>
+            {% elif category == 'warning' %}<i class="bi bi-exclamation-triangle-fill me-2"></i>
+            {% else %}<i class="bi bi-info-circle-fill me-2"></i>{% endif %}
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <!-- Page Content -->
+  <div class="page-content">
+    {% block content %}{% endblock %}
+  </div>
+</main>
+
+{% else %}
+{% block auth_content %}{% endblock %}
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

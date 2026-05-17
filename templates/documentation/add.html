@@ -1,0 +1,189 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'עריכת' if doc else 'הוספת' }} תיעוד — מערכת ייעוץ{% endblock %}
+{% block page_title %}{{ 'עריכת תיעוד' if doc else 'תיעוד חדש' }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('students_list') }}" class="btn btn-outline-secondary btn-sm">
+  <i class="bi bi-arrow-right"></i> חזרה לרשימה
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-10">
+    <form method="POST" enctype="multipart/form-data"
+          action="{{ url_for('documentation_edit', doc_id=doc.id) if doc else url_for('documentation_add') }}">
+
+      <div class="row g-4">
+
+        <!-- Right Column: Student + Date + Urgency -->
+        <div class="col-md-4">
+
+          <div class="card mb-3">
+            <div class="card-header fw-semibold"><i class="bi bi-person-fill text-primary me-2"></i>פרטים בסיסיים</div>
+            <div class="card-body">
+
+              <!-- Student -->
+              <div class="mb-3">
+                <label class="form-label fw-semibold">תלמיד/ה <span class="text-danger">*</span></label>
+                {% if doc %}
+                  <input type="hidden" name="student_id" value="{{ doc.student_id }}">
+                  <div class="form-control-plaintext fw-semibold" dir="auto">{{ doc.student.full_name }} — {{ doc.student.class_name }}</div>
+                {% else %}
+                  <select name="student_id" class="form-select" required id="studentSelect">
+                    <option value="">— בחר תלמיד/ה —</option>
+                    {% for s in students %}
+                    <option value="{{ s.id }}"
+                      {% if pre_student and s.id == pre_student.id %}selected{% endif %}>
+                      {{ s.full_name }} — {{ s.class_name }}
+                    </option>
+                    {% endfor %}
+                  </select>
+                {% endif %}
+              </div>
+
+              <!-- Date -->
+              <div class="mb-3">
+                <label class="form-label fw-semibold">תאריך</label>
+                <input type="date" name="date" class="form-control" dir="ltr"
+                       value="{{ doc.date.strftime('%Y-%m-%d') if doc else today.strftime('%Y-%m-%d') }}" required>
+              </div>
+
+              <!-- Urgency -->
+              <div class="mb-3">
+                <label class="form-label fw-semibold">רמת דחיפות</label>
+                <div class="d-flex gap-2 flex-wrap">
+                  {% for val, label, color in [('low','נמוך','success'),('medium','בינוני','warning'),('high','גבוה','danger')] %}
+                  <div class="form-check urgency-radio">
+                    <input class="form-check-input" type="radio" name="urgency" id="urg-{{ val }}"
+                           value="{{ val }}" {% if (doc and doc.urgency == val) or (not doc and val == 'low') %}checked{% endif %}>
+                    <label class="form-check-label badge bg-{{ color }} urgency-label" for="urg-{{ val }}">{{ label }}</label>
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+
+              <!-- Participants -->
+              <div class="mb-3">
+                <label class="form-label fw-semibold">משתתפים</label>
+                <input type="text" name="participants" class="form-control"
+                       value="{{ doc.participants or '' if doc else '' }}"
+                       placeholder="תלמיד, יועצת, הורים...">
+              </div>
+
+              <!-- Follow-up Date -->
+              <div class="mb-3">
+                <label class="form-label fw-semibold">תאריך מעקב</label>
+                <input type="date" name="followup_date" class="form-control" dir="ltr"
+                       value="{{ doc.followup_date.strftime('%Y-%m-%d') if doc and doc.followup_date else '' }}">
+                <div class="form-text">יצור משימת מעקב אוטומטית</div>
+              </div>
+
+              <!-- File Upload (new doc only) -->
+              {% if not doc %}
+              <div class="mb-3">
+                <label class="form-label fw-semibold">קובץ מצורף (אופציונלי)</label>
+                <input type="file" name="file" class="form-control"
+                       accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls,.txt">
+              </div>
+              {% endif %}
+
+            </div>
+          </div>
+        </div>
+
+        <!-- Left Column: Categories + Content -->
+        <div class="col-md-8">
+
+          <!-- Categories -->
+          <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center fw-semibold">
+              <span><i class="bi bi-tags-fill text-primary me-2"></i>קטגוריות תיעוד</span>
+              <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-secondary" id="selectAllCats">בחר הכל</button>
+                <button type="button" class="btn btn-outline-secondary" id="clearAllCats">נקה</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="categories-grid">
+                {% for cat in DOC_CATEGORIES %}
+                <div class="form-check category-check">
+                  <input class="form-check-input cat-checkbox" type="checkbox" name="categories"
+                         value="{{ cat }}" id="cat-{{ loop.index }}"
+                         {% if doc and cat in doc.categories_list %}checked{% endif %}>
+                  <label class="form-check-label" for="cat-{{ loop.index }}">{{ cat }}</label>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+
+          <!-- Content Fields -->
+          <div class="card">
+            <div class="card-header fw-semibold"><i class="bi bi-pencil-square text-primary me-2"></i>תוכן התיעוד</div>
+            <div class="card-body">
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">סיכום המפגש / השיחה <span class="text-danger">*</span></label>
+                <textarea name="summary" class="form-control" rows="4" required
+                          placeholder="תאר את עיקרי השיחה / המפגש...">{{ doc.summary if doc else '' }}</textarea>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">חששות / בעיות שעלו</label>
+                <textarea name="concerns" class="form-control" rows="3"
+                          placeholder="מה עלה בשיחה? מה מדאיג?">{{ doc.concerns or '' if doc else '' }}</textarea>
+              </div>
+
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label class="form-label fw-semibold">החלטות שהתקבלו</label>
+                    <textarea name="decisions" class="form-control" rows="3"
+                              placeholder="מה הוחלט?">{{ doc.decisions or '' if doc else '' }}</textarea>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label class="form-label fw-semibold">צעדים הבאים</label>
+                    <textarea name="next_steps" class="form-control" rows="3"
+                              placeholder="מה צריך לעשות?">{{ doc.next_steps or '' if doc else '' }}</textarea>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <div class="mt-4 d-flex justify-content-end gap-2">
+        {% if doc %}
+        <a href="{{ url_for('student_profile', student_id=doc.student_id) }}#documentation"
+           class="btn btn-outline-secondary">ביטול</a>
+        {% else %}
+        <a href="{{ url_for('students_list') }}" class="btn btn-outline-secondary">ביטול</a>
+        {% endif %}
+        <button type="submit" class="btn btn-primary px-5">
+          <i class="bi bi-check-lg"></i>
+          {{ 'שמור שינויים' if doc else 'שמור תיעוד' }}
+        </button>
+      </div>
+
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('selectAllCats').addEventListener('click', function() {
+  document.querySelectorAll('.cat-checkbox').forEach(cb => cb.checked = true);
+});
+document.getElementById('clearAllCats').addEventListener('click', function() {
+  document.querySelectorAll('.cat-checkbox').forEach(cb => cb.checked = false);
+});
+</script>
+{% endblock %}

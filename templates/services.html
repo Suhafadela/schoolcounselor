@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+{% block title %}שירותי תמיכה — מערכת ייעוץ{% endblock %}
+{% block page_title %}שירותי תמיכה{% endblock %}
+
+{% block content %}
+
+<!-- Service Type Summary Cards -->
+<div class="row g-3 mb-4">
+  {% for stype, cnt in type_counts.items() if cnt > 0 %}
+  <div class="col-6 col-md-3 col-lg-2">
+    <a href="{{ url_for('services_overview', type=stype) }}"
+       class="text-decoration-none">
+      <div class="service-stat-card {% if stype_filter == stype %}active{% endif %}">
+        <div class="service-stat-count">{{ cnt }}</div>
+        <div class="service-stat-label">{{ stype }}</div>
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="GET" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">סוג שירות</label>
+        <select name="type" class="form-select">
+          <option value="">כל השירותים</option>
+          {% for st in SERVICE_TYPES %}
+          <option value="{{ st }}" {% if stype == st %}selected{% endif %}>{{ st }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold">סטטוס</label>
+        <select name="status" class="form-select">
+          <option value="">כל הסטטוסים</option>
+          {% for key, label in SERVICE_STATUS_LABELS.items() %}
+          <option value="{{ key }}" {% if status_filter == key %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2 d-flex gap-2">
+        <button type="submit" class="btn btn-primary flex-grow-1">
+          <i class="bi bi-filter"></i> סנן
+        </button>
+        <a href="{{ url_for('services_overview') }}" class="btn btn-outline-secondary">
+          <i class="bi bi-x-lg"></i>
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Services Table -->
+{% if services %}
+<div class="card">
+  <div class="card-header fw-semibold d-flex justify-content-between">
+    <span><i class="bi bi-heart-pulse-fill text-primary me-2"></i>רשימת שירותים</span>
+    <span class="text-muted small">{{ services | length }} שירותים</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>תלמיד/ה</th>
+          <th>כיתה</th>
+          <th>סוג שירות</th>
+          <th>אחראי/ת</th>
+          <th>תדירות</th>
+          <th>תאריך התחלה</th>
+          <th>סטטוס</th>
+          <th>הערות</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for svc in services %}
+        <tr>
+          <td>
+            <a href="{{ url_for('student_profile', student_id=svc.student_id) }}#services"
+               class="fw-semibold text-decoration-none text-dark" dir="auto">
+              {{ svc.student.full_name }}
+            </a>
+          </td>
+          <td>{{ svc.student.class_name }}</td>
+          <td><span class="badge bg-primary-subtle text-primary-emphasis">{{ svc.service_type }}</span></td>
+          <td>{{ svc.responsible_person or '—' }}</td>
+          <td>{{ svc.frequency or '—' }}</td>
+          <td>{{ svc.start_date.strftime('%d/%m/%Y') if svc.start_date else '—' }}</td>
+          <td>
+            {% if current_user.is_admin %}
+            <form method="POST" action="{{ url_for('service_status', svc_id=svc.id) }}">
+              <select name="status" class="form-select form-select-sm" onchange="this.form.submit()"
+                      style="min-width:90px">
+                <option value="active" {% if svc.status == 'active' %}selected{% endif %}>פעיל</option>
+                <option value="waiting" {% if svc.status == 'waiting' %}selected{% endif %}>ממתין</option>
+                <option value="finished" {% if svc.status == 'finished' %}selected{% endif %}>הסתיים</option>
+              </select>
+            </form>
+            {% else %}
+            <span class="badge bg-{{ svc.status_color }}">{{ svc.status_label }}</span>
+            {% endif %}
+          </td>
+          <td class="small text-muted">{{ svc.notes or '' }}</td>
+          <td>
+            <div class="d-flex gap-1">
+              <a href="{{ url_for('student_profile', student_id=svc.student_id) }}#services"
+                 class="btn btn-sm btn-outline-primary" title="פתח תיק">
+                <i class="bi bi-folder2-open"></i>
+              </a>
+              {% if current_user.is_admin %}
+              <a href="{{ url_for('service_edit', svc_id=svc.id) }}"
+                 class="btn btn-sm btn-outline-secondary" title="ערוך שירות">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <button type="button" class="btn btn-sm btn-outline-danger" title="מחק שירות"
+                      data-bs-toggle="modal" data-bs-target="#deleteSvcModal{{ svc.id }}">
+                <i class="bi bi-trash3"></i>
+              </button>
+              {% endif %}
+            </div>
+
+            <!-- Delete service modal -->
+            {% if current_user.is_admin %}
+            <div class="modal fade" id="deleteSvcModal{{ svc.id }}" tabindex="-1">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>מחיקת שירות</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body">
+                    <p>האם למחוק את שירות <strong>{{ svc.service_type }}</strong> עבור <span dir="auto">{{ svc.student.full_name }}</span>?</p>
+                    <p class="text-muted small">פעולה זו אינה ניתנת לשחזור.</p>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ביטול</button>
+                    <form method="POST" action="{{ url_for('service_delete', svc_id=svc.id) }}" class="d-inline">
+                      <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash3"></i> מחק
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-heart-pulse display-3"></i>
+  <h5 class="mt-3">לא נמצאו שירותי תמיכה</h5>
+  <p>שנה את פרמטרי הסינון או הוסף שירות מתוך תיק התלמיד</p>
+</div>
+{% endif %}
+
+{% endblock %}

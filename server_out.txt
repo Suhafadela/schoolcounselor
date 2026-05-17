@@ -1,0 +1,4 @@
+School Counselor App running at: http://localhost:5000
+Login: admin / counselor2024
+ * Serving Flask app 'app'
+ * Debug mode: off
