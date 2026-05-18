@@ -267,6 +267,10 @@ def register_routes(app):
         logout_user()
         return redirect(url_for('login'))
 
+    @app.route('/ping')
+    def ping():
+        return 'ok', 200
+
     # ── Dashboard ─────────────────────────────────────────────────────────
     @app.route('/')
     @login_required
@@ -354,6 +358,29 @@ def register_routes(app):
         pagination = query.order_by(Student.class_name, Student.full_name).paginate(
             page=page, per_page=per_page, error_out=False)
         students = pagination.items
+        student_ids = [s.id for s in students]
+
+        # 3 queries instead of N*3 queries
+        doc_counts = {}
+        task_counts = {}
+        last_dates = {}
+        if student_ids:
+            doc_counts = dict(db.session.query(
+                Documentation.student_id, func.count(Documentation.id)
+            ).filter(Documentation.student_id.in_(student_ids)
+            ).group_by(Documentation.student_id).all())
+
+            task_counts = dict(db.session.query(
+                FollowUpTask.student_id, func.count(FollowUpTask.id)
+            ).filter(
+                FollowUpTask.student_id.in_(student_ids),
+                FollowUpTask.is_completed == False
+            ).group_by(FollowUpTask.student_id).all())
+
+            last_dates = dict(db.session.query(
+                Documentation.student_id, func.max(Documentation.date)
+            ).filter(Documentation.student_id.in_(student_ids)
+            ).group_by(Documentation.student_id).all())
 
         classes = [r[0] for r in db.session.query(Student.class_name)
                    .distinct().order_by(Student.class_name).all()]
@@ -363,6 +390,9 @@ def register_routes(app):
         return render_template('students/list.html',
                                students=students,
                                pagination=pagination,
+                               doc_counts=doc_counts,
+                               task_counts=task_counts,
+                               last_dates=last_dates,
                                classes=classes,
                                grades=grades,
                                q=q, grade=grade,

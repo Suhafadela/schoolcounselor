@@ -124,17 +124,17 @@
           <td>
             <span class="badge bg-{{ s.status_color }}">{{ s.status_label }}</span>
           </td>
-          <td>{{ s.documentation.count() }}</td>
+          <td>{{ doc_counts.get(s.id, 0) }}</td>
           <td>
-            {% if s.open_tasks_count > 0 %}
-            <span class="badge bg-warning text-dark">{{ s.open_tasks_count }}</span>
+            {% if task_counts.get(s.id, 0) > 0 %}
+            <span class="badge bg-warning text-dark">{{ task_counts.get(s.id, 0) }}</span>
             {% else %}
             <span class="text-muted">—</span>
             {% endif %}
           </td>
           <td>
-            {% if s.last_doc_date %}
-            {{ s.last_doc_date.strftime('%d/%m/%Y') }}
+            {% if last_dates.get(s.id) %}
+            {{ last_dates.get(s.id).strftime('%d/%m/%Y') }}
             {% else %}
             <span class="text-muted">אין</span>
             {% endif %}
@@ -186,13 +186,13 @@
         </div>
         {% endif %}
         <div class="student-card-stats">
-          <span title="תיעודים"><i class="bi bi-journal-text text-primary"></i> {{ s.documentation.count() }}</span>
-          <span title="משימות פתוחות" class="{% if s.open_tasks_count > 0 %}text-warning{% endif %}">
-            <i class="bi bi-bell"></i> {{ s.open_tasks_count }}
+          <span title="תיעודים"><i class="bi bi-journal-text text-primary"></i> {{ doc_counts.get(s.id, 0) }}</span>
+          <span title="משימות פתוחות" class="{% if task_counts.get(s.id, 0) > 0 %}text-warning{% endif %}">
+            <i class="bi bi-bell"></i> {{ task_counts.get(s.id, 0) }}
           </span>
-          {% if s.last_doc_date %}
+          {% if last_dates.get(s.id) %}
           <span title="תיעוד אחרון" class="text-muted small">
-            <i class="bi bi-calendar3"></i> {{ s.last_doc_date.strftime('%d/%m/%Y') }}
+            <i class="bi bi-calendar3"></i> {{ last_dates.get(s.id).strftime('%d/%m/%Y') }}
           </span>
           {% endif %}
         </div>
