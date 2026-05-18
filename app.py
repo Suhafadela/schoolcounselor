@@ -338,6 +338,8 @@ def register_routes(app):
         class_name = request.args.get('class', '')
         status = request.args.get('status', '')
         view = request.args.get('view', 'cards')
+        page = request.args.get('page', 1, type=int)
+        per_page = 48
 
         query = Student.query
         if q:
@@ -349,7 +351,10 @@ def register_routes(app):
         if status:
             query = query.filter_by(status=status)
 
-        students = query.order_by(Student.class_name, Student.full_name).all()
+        pagination = query.order_by(Student.class_name, Student.full_name).paginate(
+            page=page, per_page=per_page, error_out=False)
+        students = pagination.items
+
         classes = [r[0] for r in db.session.query(Student.class_name)
                    .distinct().order_by(Student.class_name).all()]
         grades = [r[0] for r in db.session.query(Student.grade_level)
@@ -357,6 +362,7 @@ def register_routes(app):
 
         return render_template('students/list.html',
                                students=students,
+                               pagination=pagination,
                                classes=classes,
                                grades=grades,
                                q=q, grade=grade,

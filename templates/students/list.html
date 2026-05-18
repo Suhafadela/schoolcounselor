@@ -68,7 +68,10 @@
 <!-- Results Header -->
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div class="text-muted small">
-    <strong>{{ students | length }}</strong> תלמידים נמצאו
+    <strong>{{ pagination.total }}</strong> תלמידים נמצאו
+    {% if pagination.pages > 1 %}
+    <span class="text-muted"> | עמוד {{ pagination.page }} מתוך {{ pagination.pages }}</span>
+    {% endif %}
   </div>
   <div class="btn-group btn-group-sm" role="group">
     <a href="{{ request.url | replace('view=table','') | replace('view=cards','') }}&view=cards"
@@ -208,6 +211,39 @@
   </div>
   {% endfor %}
 </div>
+{% endif %}
+
+<!-- Pagination -->
+{% if pagination.pages > 1 %}
+<nav class="mt-4 d-flex justify-content-center" aria-label="עימוד תלמידים">
+  <ul class="pagination">
+    {% if pagination.has_prev %}
+    <li class="page-item">
+      <a class="page-link" href="{{ url_for('students_list', page=pagination.prev_num, q=q, grade=grade, class=class_name, status=status, view=view) }}">
+        <i class="bi bi-chevron-right"></i> הקודם
+      </a>
+    </li>
+    {% endif %}
+
+    {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+      {% if p %}
+        <li class="page-item {% if p == pagination.page %}active{% endif %}">
+          <a class="page-link" href="{{ url_for('students_list', page=p, q=q, grade=grade, class=class_name, status=status, view=view) }}">{{ p }}</a>
+        </li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link">…</span></li>
+      {% endif %}
+    {% endfor %}
+
+    {% if pagination.has_next %}
+    <li class="page-item">
+      <a class="page-link" href="{{ url_for('students_list', page=pagination.next_num, q=q, grade=grade, class=class_name, status=status, view=view) }}">
+        הבא <i class="bi bi-chevron-left"></i>
+      </a>
+    </li>
+    {% endif %}
+  </ul>
+</nav>
 {% endif %}
 
 {% endblock %}
