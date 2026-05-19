@@ -1262,27 +1262,43 @@ def register_routes(app):
         grade = request.args.get('grade', '')
         class_name = request.args.get('class', '')
         status = request.args.get('status', '')
-        urgency = request.args.get('urgency', '')
         svc_type = request.args.get('service', '')
-        date_from_str = request.args.get('date_from', '')
-        date_to_str = request.args.get('date_to', '')
         has_open_tasks = request.args.get('open_tasks', '')
+        searched = any([grade, class_name, status, svc_type, has_open_tasks])
 
-        query = Student.query
-        if grade:
-            query = query.filter_by(grade_level=grade)
-        if class_name:
-            query = query.filter_by(class_name=class_name)
-        if status:
-            query = query.filter_by(status=status)
-        if svc_type:
-            query = query.join(SupportService).filter(
-                SupportService.service_type == svc_type,
-                SupportService.status != 'finished')
-        if has_open_tasks:
-            query = query.join(FollowUpTask).filter(FollowUpTask.is_completed == False)
+        students = []
+        doc_counts = {}
+        task_counts = {}
+        last_dates = {}
+        svc_map = {}
 
-        students = query.distinct().order_by(Student.class_name, Student.full_name).all()
+        if searched:
+            students = _filtered_students(request.args)
+            ids = [s.id for s in students]
+            if ids:
+                doc_counts = dict(db.session.query(
+                    Documentation.student_id, func.count(Documentation.id)
+                ).filter(Documentation.student_id.in_(ids)
+                ).group_by(Documentation.student_id).all())
+
+                task_counts = dict(db.session.query(
+                    FollowUpTask.student_id, func.count(FollowUpTask.id)
+                ).filter(
+                    FollowUpTask.student_id.in_(ids),
+                    FollowUpTask.is_completed == False
+                ).group_by(FollowUpTask.student_id).all())
+
+                last_dates = dict(db.session.query(
+                    Documentation.student_id, func.max(Documentation.date)
+                ).filter(Documentation.student_id.in_(ids)
+                ).group_by(Documentation.student_id).all())
+
+                svcs = SupportService.query.filter(
+                    SupportService.student_id.in_(ids),
+                    SupportService.status == 'active'
+                ).all()
+                for svc in svcs:
+                    svc_map.setdefault(svc.student_id, []).append(svc.service_type)
 
         classes = [r[0] for r in db.session.query(Student.class_name)
                    .distinct().order_by(Student.class_name).all()]
@@ -1291,6 +1307,11 @@ def register_routes(app):
 
         return render_template('reports.html',
                                students=students,
+                               searched=searched,
+                               doc_counts=doc_counts,
+                               task_counts=task_counts,
+                               last_dates=last_dates,
+                               svc_map=svc_map,
                                classes=classes,
                                grades=grades,
                                SERVICE_TYPES=SERVICE_TYPES,
@@ -1324,8 +1345,13 @@ def register_routes(app):
             cell.fill = header_fill
             cell.alignment = Alignment(horizontal='right')
 
+        ids = [s.id for s in students]
+        xdoc_counts = dict(db.session.query(Documentation.student_id, func.count(Documentation.id)).filter(Documentation.student_id.in_(ids)).group_by(Documentation.student_id).all()) if ids else {}
+        xtask_counts = dict(db.session.query(FollowUpTask.student_id, func.count(FollowUpTask.id)).filter(FollowUpTask.student_id.in_(ids), FollowUpTask.is_completed == False).group_by(FollowUpTask.student_id).all()) if ids else {}
+        xlast_dates = dict(db.session.query(Documentation.student_id, func.max(Documentation.date)).filter(Documentation.student_id.in_(ids)).group_by(Documentation.student_id).all()) if ids else {}
+
         for row, s in enumerate(students, 2):
-            last_doc = s.last_doc_date
+            last_doc = xlast_dates.get(s.id)
             ws.cell(row=row, column=1, value=s.full_name)
             ws.cell(row=row, column=2, value=s.class_name)
             ws.cell(row=row, column=3, value=s.grade_level)
@@ -1334,8 +1360,8 @@ def register_routes(app):
             ws.cell(row=row, column=6, value=s.homeroom_teacher or '')
             ws.cell(row=row, column=7, value=s.parent1_phone or '')
             ws.cell(row=row, column=8, value=s.parent2_phone or '')
-            ws.cell(row=row, column=9, value=s.documentation.count())
-            ws.cell(row=row, column=10, value=s.open_tasks_count)
+            ws.cell(row=row, column=9, value=xdoc_counts.get(s.id, 0))
+            ws.cell(row=row, column=10, value=xtask_counts.get(s.id, 0))
             ws.cell(row=row, column=11, value=last_doc.strftime('%d/%m/%Y') if last_doc else '')
             for col in range(1, 12):
                 ws.cell(row=row, column=col).alignment = Alignment(horizontal='right')
@@ -1385,14 +1411,18 @@ def register_routes(app):
         story.append(Paragraph(f'תאריך: {date.today().strftime("%d/%m/%Y")}  |  סה"כ תלמידים: {len(students)}', styles['Normal']))
         story.append(Spacer(1, 20))
 
+        pids = [s.id for s in students]
+        pdoc_counts = dict(db.session.query(Documentation.student_id, func.count(Documentation.id)).filter(Documentation.student_id.in_(pids)).group_by(Documentation.student_id).all()) if pids else {}
+        ptask_counts = dict(db.session.query(FollowUpTask.student_id, func.count(FollowUpTask.id)).filter(FollowUpTask.student_id.in_(pids), FollowUpTask.is_completed == False).group_by(FollowUpTask.student_id).all()) if pids else {}
+
         data = [['שם תלמיד', 'כיתה', 'סטטוס', 'תיעודים', 'משימות פתוחות']]
         for s in students:
             data.append([
                 s.full_name,
                 s.class_name,
                 STATUS_LABELS.get(s.status, s.status),
-                str(s.documentation.count()),
-                str(s.open_tasks_count),
+                str(pdoc_counts.get(s.id, 0)),
+                str(ptask_counts.get(s.id, 0)),
             ])
 
         table = Table(data, colWidths=[200, 60, 80, 70, 80])
