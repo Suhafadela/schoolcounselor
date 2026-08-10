@@ -1,6 +1,7 @@
 import os
 import uuid
 import json
+from calendar import monthrange
 from datetime import datetime, date, timedelta
 from functools import wraps
 
@@ -32,35 +33,44 @@ def create_app():
     # ── Database ─────────────────────────────────────────────────────────
     _db_url = os.environ.get('DATABASE_URL')
     if _db_url:
-        # Render/cloud: DATABASE_URL env var set
         # Fix old-style postgres:// → postgresql://
         if _db_url.startswith('postgres://'):
             _db_url = _db_url.replace('postgres://', 'postgresql+psycopg2://', 1)
         elif _db_url.startswith('postgresql://') and '+psycopg2' not in _db_url:
             _db_url = _db_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
+    elif os.environ.get('SUPABASE_DB_PASSWORD'):
+        # Local development against Supabase Session Pooler.
+        # Credentials come from environment variables (see .env) — never hardcode secrets here.
+        from sqlalchemy.engine import URL as _DB_URL_CLS
+        _db_url = _DB_URL_CLS.create(
+            'postgresql+psycopg2',
+            username=os.environ.get('SUPABASE_DB_USER', 'postgres.orsyquixinhvfshkoawn'),
+            password=os.environ['SUPABASE_DB_PASSWORD'],
+            host=os.environ.get('SUPABASE_DB_HOST', 'aws-0-eu-west-1.pooler.supabase.com'),
+            port=int(os.environ.get('SUPABASE_DB_PORT', 5432)),
+            database=os.environ.get('SUPABASE_DB_NAME', 'postgres'),
+        )
+
+    if _db_url:
         app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
         app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
             'pool_pre_ping': True,
             'pool_recycle': 300,
             'connect_args': {'sslmode': 'require', 'connect_timeout': 10},
         }
-    else:
-        # Local development: Supabase Session Pooler
-        from sqlalchemy.engine import URL as _DB_URL_CLS
-        _supabase_url = _DB_URL_CLS.create(
-            'postgresql+psycopg2',
-            username='postgres.orsyquixinhvfshkoawn',
-            password='209169Suhafadela',
-            host='aws-0-eu-west-1.pooler.supabase.com',
-            port=5432,
-            database='postgres',
-        )
-        app.config['SQLALCHEMY_DATABASE_URI'] = _supabase_url
-        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-            'pool_pre_ping': True,
-            'pool_recycle': 300,
-            'connect_args': {'sslmode': 'require', 'connect_timeout': 10},
-        }
+        try:
+            from sqlalchemy import create_engine
+            create_engine(_db_url, connect_args={'sslmode': 'require', 'connect_timeout': 5}).connect().close()
+        except Exception as exc:
+            print(f'WARNING: could not reach the cloud database ({exc}); falling back to local SQLite '
+                  f'({os.path.join(BASE_DIR, "counselor.db")}).')
+            _db_url = None
+
+    if not _db_url:
+        # No cloud DB configured, or it is unreachable (e.g. paused Supabase project):
+        # fall back to the local SQLite file so the app keeps working offline.
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(BASE_DIR, 'counselor.db')
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {}
 
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -307,12 +317,15 @@ def register_routes(app):
                            .order_by(Student.updated_at.desc()).limit(10).all())
 
         # Chart data: docs per month (last 6 months)
-        # Use to_char for PostgreSQL (Supabase) instead of strftime (SQLite)
+        # Use date-range filtering so it works on both SQLite (local) and PostgreSQL (Supabase)
         docs_by_month = []
         for i in range(5, -1, -1):
             m = today.replace(day=1) - timedelta(days=30 * i)
+            month_start = m.replace(day=1)
+            month_end = month_start.replace(day=monthrange(month_start.year, month_start.month)[1])
             cnt = Documentation.query.filter(
-                func.to_char(Documentation.date, 'YYYY-MM') == m.strftime('%Y-%m')
+                Documentation.date >= month_start,
+                Documentation.date <= month_end,
             ).count()
             docs_by_month.append({'label': m.strftime('%m/%Y'), 'count': cnt})
 
