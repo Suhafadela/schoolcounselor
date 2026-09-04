@@ -2,6 +2,17 @@
 {% block title %}שירותי תמיכה — מערכת ייעוץ{% endblock %}
 {% block page_title %}שירותי תמיכה{% endblock %}
 
+{% block topbar_actions %}
+{% if current_user.is_admin %}
+<a href="{{ url_for('students_import') }}" class="btn btn-success btn-sm">
+  <i class="bi bi-file-earmark-excel-fill"></i> ייבוא מאקסל
+</a>
+<a href="{{ url_for('student_add') }}" class="btn btn-primary btn-sm">
+  <i class="bi bi-person-plus-fill"></i> הוסף תלמיד
+</a>
+{% endif %}
+{% endblock %}
+
 {% block content %}
 
 <!-- Service Type Summary Cards -->
