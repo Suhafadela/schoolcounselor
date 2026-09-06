@@ -1626,15 +1626,28 @@ def register_routes(app):
                     .group_by(Student.grade_level, Student.class_name)
                     .order_by(Student.grade_level, Student.class_name).all())
         bare = Student.query.filter(Student.class_name.in_(['ז', 'ח', 'ט'])).all()
+        proper = Student.query.filter(~Student.class_name.in_(['ז', 'ח', 'ט'])).all()
+        proper_keys = {(s.full_name, s.dob) for s in proper}
+        proper_name_keys = {}
+        for s in proper:
+            proper_name_keys.setdefault(s.full_name, []).append((s.id, s.class_name, str(s.dob)))
+
+        bare_details = []
+        for s in bare:
+            exact_dup = (s.full_name, s.dob) in proper_keys
+            name_matches = proper_name_keys.get(s.full_name, [])
+            bare_details.append({
+                'id': s.id, 'name': s.full_name, 'grade': s.grade_level,
+                'dob': str(s.dob), 'created_at': str(s.created_at),
+                'exact_dup_of_proper': exact_dup,
+                'same_name_proper_records': name_matches,
+            })
+
         return jsonify({
             'by_grade': {g: c for g, c in rows},
             'by_class': [[g, c, n] for g, c, n in by_class],
             'total': Student.query.count(),
-            'bare_class_students': [
-                {'id': s.id, 'name': s.full_name, 'grade': s.grade_level,
-                 'dob': str(s.dob), 'created_at': str(s.created_at)}
-                for s in bare
-            ],
+            'bare_class_students': bare_details,
         })
 
     # ── TEMPORARY one-time maintenance route: merge grade-promotion dupes ───
