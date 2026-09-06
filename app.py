@@ -1625,10 +1625,16 @@ def register_routes(app):
         by_class = (db.session.query(Student.grade_level, Student.class_name, func.count(Student.id))
                     .group_by(Student.grade_level, Student.class_name)
                     .order_by(Student.grade_level, Student.class_name).all())
+        bare = Student.query.filter(Student.class_name.in_(['ז', 'ח', 'ט'])).all()
         return jsonify({
             'by_grade': {g: c for g, c in rows},
             'by_class': [[g, c, n] for g, c, n in by_class],
             'total': Student.query.count(),
+            'bare_class_students': [
+                {'id': s.id, 'name': s.full_name, 'grade': s.grade_level,
+                 'dob': str(s.dob), 'created_at': str(s.created_at)}
+                for s in bare
+            ],
         })
 
     # ── TEMPORARY one-time maintenance route: merge grade-promotion dupes ───
