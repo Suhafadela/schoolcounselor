@@ -1615,6 +1615,22 @@ def register_routes(app):
                                total_docs=total_docs,
                                total_tasks=total_tasks)
 
+    # ── TEMPORARY diagnostic route: grade/class breakdown ───────────────────
+    @app.route('/admin/diag-grades')
+    @login_required
+    @admin_required
+    def diag_grades():
+        rows = (db.session.query(Student.grade_level, func.count(Student.id))
+                .group_by(Student.grade_level).all())
+        by_class = (db.session.query(Student.grade_level, Student.class_name, func.count(Student.id))
+                    .group_by(Student.grade_level, Student.class_name)
+                    .order_by(Student.grade_level, Student.class_name).all())
+        return jsonify({
+            'by_grade': {g: c for g, c in rows},
+            'by_class': [[g, c, n] for g, c, n in by_class],
+            'total': Student.query.count(),
+        })
+
     # ── TEMPORARY one-time maintenance route: merge grade-promotion dupes ───
     # Removed after use. Matches old-grade student records (from before this
     # year's re-import) to their newly-imported duplicate in the next grade
