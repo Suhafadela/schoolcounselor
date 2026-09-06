@@ -1650,6 +1650,51 @@ def register_routes(app):
             'bare_class_students': bare_details,
         })
 
+    # ── TEMPORARY one-time route: clean up bare-grade class_name records ────
+    # Deletes exact-duplicate rows (same name+dob as a properly-classed
+    # record) and fixes the class_name of genuinely unique students whose
+    # class was left as just the bare grade letter, using a precomputed
+    # name/dob -> correct class mapping recovered from the source files.
+    @app.route('/admin/run-bare-class-cleanup-once', methods=['POST'])
+    @login_required
+    @admin_required
+    def run_bare_class_cleanup_once():
+        import traceback
+        try:
+            with open(os.path.join(BASE_DIR, 'dup_delete_ids.json'), encoding='utf-8') as f:
+                delete_ids = json.load(f)
+            with open(os.path.join(BASE_DIR, 'class_fixes_data.json'), encoding='utf-8') as f:
+                fixes = json.load(f)
+
+            deleted_count = 0
+            if delete_ids:
+                deleted_count = (Student.query.filter(Student.id.in_(delete_ids))
+                                  .delete(synchronize_session=False))
+                db.session.flush()
+
+            fixed = []
+            if fixes:
+                temp_mappings = [{'id': f['id'], 'class_name': f"__tmp_{f['id']}"} for f in fixes]
+                db.session.bulk_update_mappings(Student, temp_mappings)
+                db.session.flush()
+
+                final_mappings = [{'id': f['id'], 'grade_level': f['new_grade'],
+                                    'class_name': f['new_class']} for f in fixes]
+                db.session.bulk_update_mappings(Student, final_mappings)
+                fixed = [{'id': f['id'], 'name': f['name'], 'new_class': f['new_class']} for f in fixes]
+
+            db.session.commit()
+
+            return jsonify({
+                'deleted_count': deleted_count,
+                'fixed_count': len(fixed),
+                'fixed': fixed,
+                'after_total': Student.query.count(),
+            })
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
     # ── TEMPORARY one-time maintenance route: merge grade-promotion dupes ───
     # Removed after use. Matches old-grade student records (from before this
     # year's re-import) to their newly-imported duplicate in the next grade
