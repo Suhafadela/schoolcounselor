@@ -1650,6 +1650,45 @@ def register_routes(app):
             'not_in_files': not_in_files,
         })
 
+    # ── TEMPORARY one-time route: delete confirmed-departed students who
+    # don't appear in any of the 3 source files and have zero history ──────
+    @app.route('/admin/run-delete-departed-once', methods=['POST'])
+    @login_required
+    @admin_required
+    def run_delete_departed_once():
+        import traceback
+        try:
+            with open(os.path.join(BASE_DIR, 'file_keys_data.json'), encoding='utf-8') as f:
+                file_keys = set(tuple(x) for x in json.load(f))
+
+            to_delete = []
+            for s in Student.query.all():
+                key = (s.full_name, str(s.dob))
+                if key in file_keys:
+                    continue
+                has_related = (
+                    Documentation.query.filter_by(student_id=s.id).count() > 0 or
+                    SupportService.query.filter_by(student_id=s.id).count() > 0 or
+                    FollowUpTask.query.filter_by(student_id=s.id).count() > 0
+                )
+                if has_related:
+                    continue
+                to_delete.append({'id': s.id, 'name': s.full_name})
+
+            ids = [d['id'] for d in to_delete]
+            if ids:
+                Student.query.filter(Student.id.in_(ids)).delete(synchronize_session=False)
+            db.session.commit()
+
+            return jsonify({
+                'deleted': to_delete,
+                'deleted_count': len(to_delete),
+                'after_total': Student.query.count(),
+            })
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
     # ── TEMPORARY diagnostic route: grade/class breakdown ───────────────────
     @app.route('/admin/diag-grades')
     @login_required
