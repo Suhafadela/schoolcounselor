@@ -1615,6 +1615,69 @@ def register_routes(app):
                                total_docs=total_docs,
                                total_tasks=total_tasks)
 
+    # ── TEMPORARY one-time maintenance route: merge grade-promotion dupes ───
+    # Removed after use. Matches old-grade student records (from before this
+    # year's re-import) to their newly-imported duplicate in the next grade
+    # up, keeps the OLD record (and its documentation history) and just
+    # updates its grade/class, then deletes the history-less duplicate.
+    @app.route('/admin/run-promotion-merge-once', methods=['POST'])
+    @login_required
+    @admin_required
+    def run_promotion_merge_once():
+        pairs_path = os.path.join(BASE_DIR, 'promotion_pairs_data.json')
+        with open(pairs_path, encoding='utf-8') as f:
+            pairs = json.load(f)
+
+        all_pairs = [(oid, nid, cls, 'ח') for oid, nid, cls in pairs['z_to_h']] + \
+                    [(oid, nid, cls, 'ט') for oid, nid, cls in pairs['h_to_t']]
+
+        promoted = []
+        skipped_had_related = []
+        already_gone = []
+        to_update = []
+
+        for old_id, new_id, new_class, new_grade in all_pairs:
+            new_student = db.session.get(Student, new_id)
+            old_student = db.session.get(Student, old_id)
+            if not new_student or not old_student:
+                already_gone.append({'old_id': old_id, 'new_id': new_id})
+                continue
+
+            has_related = (
+                Documentation.query.filter_by(student_id=new_id).count() > 0 or
+                SupportService.query.filter_by(student_id=new_id).count() > 0 or
+                FollowUpTask.query.filter_by(student_id=new_id).count() > 0
+            )
+            if has_related:
+                skipped_had_related.append({'old_id': old_id, 'new_id': new_id, 'name': new_student.full_name})
+                continue
+
+            db.session.delete(new_student)
+            to_update.append((old_id, new_grade, new_class, old_student.full_name))
+
+        db.session.flush()
+
+        for old_id, g, c, name in to_update:
+            old_student = db.session.get(Student, old_id)
+            old_student.class_name = f'__tmp_{old_id}'
+        db.session.flush()
+
+        for old_id, g, c, name in to_update:
+            old_student = db.session.get(Student, old_id)
+            old_student.grade_level = g
+            old_student.class_name = c
+            promoted.append({'old_id': old_id, 'name': name, 'new_class': c})
+        db.session.flush()
+
+        db.session.commit()
+
+        return jsonify({
+            'promoted_count': len(promoted),
+            'skipped_had_related': skipped_had_related,
+            'already_gone_count': len(already_gone),
+            'after_total': Student.query.count(),
+        })
+
     # ── Import Debug: show detected columns without importing ──────────────
     @app.route('/students/import/debug', methods=['POST'])
     @login_required
