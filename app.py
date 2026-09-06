@@ -1633,43 +1633,52 @@ def register_routes(app):
             all_pairs = [(oid, nid, cls, 'ח') for oid, nid, cls in pairs['z_to_h']] + \
                         [(oid, nid, cls, 'ט') for oid, nid, cls in pairs['h_to_t']]
 
+            old_ids = [p[0] for p in all_pairs]
+            new_ids = [p[1] for p in all_pairs]
+
+            existing_old = {s.id: s.full_name for s in
+                             Student.query.filter(Student.id.in_(old_ids)).all()}
+            existing_new = {s.id: s.full_name for s in
+                             Student.query.filter(Student.id.in_(new_ids)).all()}
+
+            related_new_ids = set()
+            for model in (Documentation, SupportService, FollowUpTask):
+                rows = (db.session.query(model.student_id)
+                        .filter(model.student_id.in_(new_ids))
+                        .distinct().all())
+                related_new_ids.update(r[0] for r in rows)
+
             promoted = []
             skipped_had_related = []
             already_gone = []
-            to_update = []
+            to_update = []   # (old_id, new_grade, new_class, name)
+            delete_ids = []
 
             for old_id, new_id, new_class, new_grade in all_pairs:
-                new_student = db.session.get(Student, new_id)
-                old_student = db.session.get(Student, old_id)
-                if not new_student or not old_student:
+                old_name = existing_old.get(old_id)
+                new_name = existing_new.get(new_id)
+                if old_name is None or new_name is None:
                     already_gone.append({'old_id': old_id, 'new_id': new_id})
                     continue
-
-                has_related = (
-                    Documentation.query.filter_by(student_id=new_id).count() > 0 or
-                    SupportService.query.filter_by(student_id=new_id).count() > 0 or
-                    FollowUpTask.query.filter_by(student_id=new_id).count() > 0
-                )
-                if has_related:
-                    skipped_had_related.append({'old_id': old_id, 'new_id': new_id, 'name': new_student.full_name})
+                if new_id in related_new_ids:
+                    skipped_had_related.append({'old_id': old_id, 'new_id': new_id, 'name': new_name})
                     continue
+                delete_ids.append(new_id)
+                to_update.append((old_id, new_grade, new_class, old_name))
 
-                db.session.delete(new_student)
-                to_update.append((old_id, new_grade, new_class, old_student.full_name))
+            if delete_ids:
+                Student.query.filter(Student.id.in_(delete_ids)).delete(synchronize_session=False)
+                db.session.flush()
 
-            db.session.flush()
+            if to_update:
+                temp_mappings = [{'id': oid, 'class_name': f'__tmp_{oid}'} for oid, g, c, n in to_update]
+                db.session.bulk_update_mappings(Student, temp_mappings)
+                db.session.flush()
 
-            for old_id, g, c, name in to_update:
-                old_student = db.session.get(Student, old_id)
-                old_student.class_name = f'__tmp_{old_id}'
-            db.session.flush()
-
-            for old_id, g, c, name in to_update:
-                old_student = db.session.get(Student, old_id)
-                old_student.grade_level = g
-                old_student.class_name = c
-                promoted.append({'old_id': old_id, 'name': name, 'new_class': c})
-            db.session.flush()
+                final_mappings = [{'id': oid, 'grade_level': g, 'class_name': c} for oid, g, c, n in to_update]
+                db.session.bulk_update_mappings(Student, final_mappings)
+                for oid, g, c, n in to_update:
+                    promoted.append({'old_id': oid, 'name': n, 'new_class': c})
 
             db.session.commit()
 
