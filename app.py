@@ -1637,6 +1637,12 @@ def register_routes(app):
                     'created_at': str(s.created_at),
                 })
 
+        for item in not_in_files:
+            sid = item['id']
+            item['doc_count'] = Documentation.query.filter_by(student_id=sid).count()
+            item['service_count'] = SupportService.query.filter_by(student_id=sid).count()
+            item['task_count'] = FollowUpTask.query.filter_by(student_id=sid).count()
+
         return jsonify({
             'total': Student.query.count(),
             'in_files': in_files,
