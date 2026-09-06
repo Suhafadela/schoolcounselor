@@ -1643,11 +1643,24 @@ def register_routes(app):
                 'same_name_proper_records': name_matches,
             })
 
+        dup_rows = (db.session.query(Student.full_name, Student.grade_level, func.count(Student.id))
+                    .group_by(Student.full_name, Student.grade_level)
+                    .having(func.count(Student.id) > 1).all())
+        dup_details = []
+        for name, grade, cnt in dup_rows:
+            members = Student.query.filter_by(full_name=name, grade_level=grade).all()
+            dup_details.append({
+                'name': name, 'grade': grade, 'count': cnt,
+                'members': [{'id': s.id, 'class_name': s.class_name, 'dob': str(s.dob),
+                             'created_at': str(s.created_at)} for s in members],
+            })
+
         return jsonify({
             'by_grade': {g: c for g, c in rows},
             'by_class': [[g, c, n] for g, c, n in by_class],
             'total': Student.query.count(),
             'bare_class_students': bare_details,
+            'same_name_same_grade_dupes': dup_details,
         })
 
     # ── TEMPORARY one-time route: clean up bare-grade class_name records ────
