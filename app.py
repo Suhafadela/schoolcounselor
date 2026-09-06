@@ -1615,6 +1615,35 @@ def register_routes(app):
                                total_docs=total_docs,
                                total_tasks=total_tasks)
 
+    # ── TEMPORARY diagnostic route: reconcile every student against the
+    # source Excel files (the declared full/authoritative roster) ──────────
+    @app.route('/admin/diag-reconcile')
+    @login_required
+    @admin_required
+    def diag_reconcile():
+        with open(os.path.join(BASE_DIR, 'file_keys_data.json'), encoding='utf-8') as f:
+            file_keys = set(tuple(x) for x in json.load(f))
+
+        not_in_files = []
+        in_files = 0
+        for s in Student.query.all():
+            key = (s.full_name, str(s.dob))
+            if key in file_keys:
+                in_files += 1
+            else:
+                not_in_files.append({
+                    'id': s.id, 'name': s.full_name, 'grade': s.grade_level,
+                    'class_name': s.class_name, 'dob': str(s.dob),
+                    'created_at': str(s.created_at),
+                })
+
+        return jsonify({
+            'total': Student.query.count(),
+            'in_files': in_files,
+            'not_in_files_count': len(not_in_files),
+            'not_in_files': not_in_files,
+        })
+
     # ── TEMPORARY diagnostic route: grade/class breakdown ───────────────────
     @app.route('/admin/diag-grades')
     @login_required
