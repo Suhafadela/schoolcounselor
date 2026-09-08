@@ -977,22 +977,39 @@ def register_routes(app):
                  .filter_by(is_completed=False)
                  .order_by(FollowUpTask.due_date).all())
 
-        # Register Windows Arial font (supports Hebrew & Arabic)
-        FONT_NAME = 'Arial'
-        FONT_BOLD = 'Arial-Bold'
+        # Register a bundled Unicode font that covers both Hebrew and Arabic
+        # (Noto Sans Hebrew + Noto Sans Arabic merged into one font file).
+        # Bundled in the repo so it works the same on any server, not just
+        # a Windows machine that happens to have Arial installed locally.
+        FONT_NAME = 'NotoMerged'
+        FONT_BOLD = 'NotoMerged-Bold'
         font_registered = False
-        for font_path, bold_path in [
-            (r'C:\Windows\Fonts\arial.ttf', r'C:\Windows\Fonts\arialbd.ttf'),
-            (r'C:\Windows\Fonts\ARIAL.TTF', r'C:\Windows\Fonts\ARIALBD.TTF'),
-        ]:
-            if os.path.exists(font_path) and os.path.exists(bold_path):
-                try:
-                    pdfmetrics.registerFont(TTFont(FONT_NAME, font_path))
-                    pdfmetrics.registerFont(TTFont(FONT_BOLD, bold_path))
-                    font_registered = True
-                    break
-                except Exception:
-                    pass
+        try:
+            reg_path = os.path.join(BASE_DIR, 'fonts', 'NotoMerged-Regular.ttf')
+            bold_path = os.path.join(BASE_DIR, 'fonts', 'NotoMerged-Bold.ttf')
+            if os.path.exists(reg_path) and os.path.exists(bold_path):
+                pdfmetrics.registerFont(TTFont(FONT_NAME, reg_path))
+                pdfmetrics.registerFont(TTFont(FONT_BOLD, bold_path))
+                font_registered = True
+        except Exception:
+            pass
+        if not font_registered:
+            # Fall back to Windows Arial if available (local dev machine),
+            # otherwise Helvetica (no Hebrew/Arabic glyphs — last resort).
+            FONT_NAME = 'Arial'
+            FONT_BOLD = 'Arial-Bold'
+            for font_path, bold_path in [
+                (r'C:\Windows\Fonts\arial.ttf', r'C:\Windows\Fonts\arialbd.ttf'),
+                (r'C:\Windows\Fonts\ARIAL.TTF', r'C:\Windows\Fonts\ARIALBD.TTF'),
+            ]:
+                if os.path.exists(font_path) and os.path.exists(bold_path):
+                    try:
+                        pdfmetrics.registerFont(TTFont(FONT_NAME, font_path))
+                        pdfmetrics.registerFont(TTFont(FONT_BOLD, bold_path))
+                        font_registered = True
+                        break
+                    except Exception:
+                        pass
         if not font_registered:
             FONT_NAME = 'Helvetica'
             FONT_BOLD = 'Helvetica-Bold'
@@ -1398,7 +1415,7 @@ def register_routes(app):
         try:
             from reportlab.lib.pagesizes import A4
             from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-            from reportlab.lib.styles import getSampleStyleSheet
+            from reportlab.lib.styles import ParagraphStyle
             from reportlab.lib import colors
             from reportlab.pdfbase import pdfmetrics
             from reportlab.pdfbase.ttfonts import TTFont
@@ -1407,6 +1424,48 @@ def register_routes(app):
             return redirect(url_for('reports'))
 
         import io
+
+        # Register the bundled Unicode font (Hebrew + Arabic) — same font
+        # used for the student PDF export, so this works on any server.
+        FONT_NAME = 'NotoMerged'
+        FONT_BOLD = 'NotoMerged-Bold'
+        font_registered = False
+        try:
+            reg_path = os.path.join(BASE_DIR, 'fonts', 'NotoMerged-Regular.ttf')
+            bold_path = os.path.join(BASE_DIR, 'fonts', 'NotoMerged-Bold.ttf')
+            if os.path.exists(reg_path) and os.path.exists(bold_path):
+                pdfmetrics.registerFont(TTFont(FONT_NAME, reg_path))
+                pdfmetrics.registerFont(TTFont(FONT_BOLD, bold_path))
+                font_registered = True
+        except Exception:
+            pass
+        if not font_registered:
+            FONT_NAME = 'Helvetica'
+            FONT_BOLD = 'Helvetica-Bold'
+
+        def rtl(text):
+            if not text:
+                return ''
+            text = str(text)
+            try:
+                from bidi.algorithm import get_display
+                try:
+                    import arabic_reshaper
+                    text = arabic_reshaper.reshape(text)
+                except ImportError:
+                    pass
+                return get_display(text)
+            except ImportError:
+                return ' '.join(reversed(text.split()))
+
+        def style(size=10, bold=False, color=colors.black, align='RIGHT'):
+            return ParagraphStyle(
+                name='_', fontName=FONT_BOLD if bold else FONT_NAME,
+                fontSize=size, textColor=color,
+                alignment={'RIGHT': 2, 'LEFT': 0, 'CENTER': 1}.get(align, 2),
+                leading=size * 1.4, wordWrap='RTL',
+            )
+
         students = _filtered_students(request.args)
 
         buf = io.BytesIO()
@@ -1414,36 +1473,33 @@ def register_routes(app):
                                 rightMargin=40, leftMargin=40,
                                 topMargin=40, bottomMargin=40)
 
-        styles = getSampleStyleSheet()
         story = []
-
-        title_style = styles['Title']
-        title = Paragraph('דוח תלמידים', title_style)
-        story.append(title)
+        story.append(Paragraph(rtl('דוח תלמידים'), style(size=18, bold=True)))
         story.append(Spacer(1, 12))
-        story.append(Paragraph(f'תאריך: {date.today().strftime("%d/%m/%Y")}  |  סה"כ תלמידים: {len(students)}', styles['Normal']))
+        story.append(Paragraph(
+            rtl(f'תאריך: {date.today().strftime("%d/%m/%Y")}  |  סה"כ תלמידים: {len(students)}'),
+            style(size=10, color=colors.grey)))
         story.append(Spacer(1, 20))
 
         pids = [s.id for s in students]
         pdoc_counts = dict(db.session.query(Documentation.student_id, func.count(Documentation.id)).filter(Documentation.student_id.in_(pids)).group_by(Documentation.student_id).all()) if pids else {}
         ptask_counts = dict(db.session.query(FollowUpTask.student_id, func.count(FollowUpTask.id)).filter(FollowUpTask.student_id.in_(pids), FollowUpTask.is_completed == False).group_by(FollowUpTask.student_id).all()) if pids else {}
 
-        data = [['שם תלמיד', 'כיתה', 'סטטוס', 'תיעודים', 'משימות פתוחות']]
+        header = ['שם תלמיד', 'כיתה', 'סטטוס', 'תיעודים', 'משימות פתוחות']
+        data = [[Paragraph(rtl(h), style(size=10, bold=True, color=colors.white)) for h in header]]
         for s in students:
             data.append([
-                s.full_name,
-                s.class_name,
-                STATUS_LABELS.get(s.status, s.status),
-                str(pdoc_counts.get(s.id, 0)),
-                str(ptask_counts.get(s.id, 0)),
+                Paragraph(rtl(s.full_name), style(size=9)),
+                Paragraph(rtl(s.class_name), style(size=9)),
+                Paragraph(rtl(STATUS_LABELS.get(s.status, s.status)), style(size=9)),
+                Paragraph(rtl(str(pdoc_counts.get(s.id, 0))), style(size=9)),
+                Paragraph(rtl(str(ptask_counts.get(s.id, 0))), style(size=9)),
             ])
 
         table = Table(data, colWidths=[200, 60, 80, 70, 80])
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2B6CB0')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('FONTSIZE', (0, 1), (-1, -1), 9),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.whitesmoke, colors.white]),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
             ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
