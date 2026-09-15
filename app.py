@@ -13,7 +13,7 @@ from werkzeug.utils import secure_filename
 from sqlalchemy import func, or_
 
 from models import (db, User, Student, Documentation, DocumentationCategory,
-                    SupportService, FollowUpTask, Attachment,
+                    SupportService, FollowUpTask, Attachment, SchoolMeeting,
                     DOC_CATEGORIES, SERVICE_TYPES,
                     STATUS_LABELS, STATUS_COLORS, URGENCY_LABELS, URGENCY_COLORS,
                     SERVICE_STATUS_LABELS)
@@ -1215,6 +1215,97 @@ def register_routes(app):
         response.headers['Content-Type'] = 'application/pdf'
         response.headers['Content-Disposition'] = f'attachment; filename="student_{student.id}.pdf"'
         return response
+
+    # ── School Meetings (general, not tied to a student) ───────────────────
+    @app.route('/meetings')
+    @login_required
+    def meetings_list():
+        meetings = SchoolMeeting.query.order_by(SchoolMeeting.date.desc()).all()
+        return render_template('meetings/list.html', meetings=meetings, today=date.today())
+
+    @app.route('/meetings/add', methods=['GET', 'POST'])
+    @login_required
+    @admin_required
+    def meeting_add():
+        if request.method == 'POST':
+            date_str = request.form.get('date', '').strip()
+            try:
+                meeting_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                meeting_date = date.today()
+
+            needs_followup = request.form.get('needs_followup') == 'on'
+            followup_date_str = request.form.get('followup_date', '').strip()
+            followup_date = None
+            if needs_followup and followup_date_str:
+                try:
+                    followup_date = datetime.strptime(followup_date_str, '%Y-%m-%d').date()
+                except ValueError:
+                    pass
+
+            meeting = SchoolMeeting(
+                date=meeting_date,
+                title=request.form.get('title', '').strip() or None,
+                participants=request.form.get('participants', '').strip() or None,
+                documentation=request.form.get('documentation', '').strip(),
+                decisions=request.form.get('decisions', '').strip() or None,
+                summary=request.form.get('summary', '').strip() or None,
+                needs_followup=needs_followup,
+                followup_date=followup_date,
+                followup_notes=request.form.get('followup_notes', '').strip() or None,
+                created_by=current_user.id,
+            )
+            db.session.add(meeting)
+            db.session.commit()
+            flash('הפגישה נשמרה בהצלחה.', 'success')
+            return redirect(url_for('meetings_list'))
+
+        return render_template('meetings/add.html', meeting=None, today=date.today())
+
+    @app.route('/meetings/<int:meeting_id>/edit', methods=['GET', 'POST'])
+    @login_required
+    @admin_required
+    def meeting_edit(meeting_id):
+        meeting = SchoolMeeting.query.get_or_404(meeting_id)
+        if request.method == 'POST':
+            date_str = request.form.get('date', '').strip()
+            try:
+                meeting.date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+
+            meeting.title = request.form.get('title', '').strip() or None
+            meeting.participants = request.form.get('participants', '').strip() or None
+            meeting.documentation = request.form.get('documentation', '').strip()
+            meeting.decisions = request.form.get('decisions', '').strip() or None
+            meeting.summary = request.form.get('summary', '').strip() or None
+            meeting.needs_followup = request.form.get('needs_followup') == 'on'
+            meeting.followup_notes = request.form.get('followup_notes', '').strip() or None
+
+            followup_date_str = request.form.get('followup_date', '').strip()
+            if meeting.needs_followup and followup_date_str:
+                try:
+                    meeting.followup_date = datetime.strptime(followup_date_str, '%Y-%m-%d').date()
+                except ValueError:
+                    meeting.followup_date = None
+            else:
+                meeting.followup_date = None
+
+            db.session.commit()
+            flash('הפגישה עודכנה בהצלחה.', 'success')
+            return redirect(url_for('meetings_list'))
+
+        return render_template('meetings/add.html', meeting=meeting, today=date.today())
+
+    @app.route('/meetings/<int:meeting_id>/delete', methods=['POST'])
+    @login_required
+    @admin_required
+    def meeting_delete(meeting_id):
+        meeting = SchoolMeeting.query.get_or_404(meeting_id)
+        db.session.delete(meeting)
+        db.session.commit()
+        flash('הפגישה נמחקה.', 'success')
+        return redirect(url_for('meetings_list'))
 
     # ── Reminders / Tasks ──────────────────────────────────────────────────
     @app.route('/reminders')

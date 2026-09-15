@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% block title %}פגישות בית ספר — מערכת ייעוץ{% endblock %}
+{% block page_title %}פגישות בית ספר{% endblock %}
+
+{% block topbar_actions %}
+{% if current_user.is_admin %}
+<a href="{{ url_for('meeting_add') }}" class="btn btn-primary btn-sm">
+  <i class="bi bi-plus-lg"></i> פגישה חדשה
+</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+{% if meetings %}
+<div class="row g-3">
+  {% for m in meetings %}
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <span class="fw-semibold">
+            <i class="bi bi-calendar-event-fill text-primary me-2"></i>
+            {{ m.title or 'פגישה' }}
+          </span>
+          <span class="text-muted small ms-2">{{ m.date.strftime('%d/%m/%Y') }}</span>
+          {% if m.needs_followup %}
+          <span class="badge bg-warning-subtle text-warning-emphasis ms-2">
+            <i class="bi bi-arrow-repeat"></i> נדרש המשך טיפול
+            {% if m.followup_date %} — {{ m.followup_date.strftime('%d/%m/%Y') }}{% endif %}
+          </span>
+          {% endif %}
+        </div>
+        {% if current_user.is_admin %}
+        <div class="d-flex gap-1">
+          <a href="{{ url_for('meeting_edit', meeting_id=m.id) }}" class="btn btn-sm btn-outline-secondary" title="ערוך">
+            <i class="bi bi-pencil"></i>
+          </a>
+          <button type="button" class="btn btn-sm btn-outline-danger" title="מחק"
+                  data-bs-toggle="modal" data-bs-target="#deleteModal{{ m.id }}">
+            <i class="bi bi-trash3"></i>
+          </button>
+        </div>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        {% if m.participants %}
+        <div class="mb-2">
+          <span class="fw-semibold small text-muted"><i class="bi bi-people-fill me-1"></i>משתתפים:</span>
+          <span class="small">{{ m.participants }}</span>
+        </div>
+        {% endif %}
+        <div class="mb-2">
+          <span class="fw-semibold small text-muted">תיעוד הפגישה:</span>
+          <div class="small">{{ m.documentation }}</div>
+        </div>
+        {% if m.decisions %}
+        <div class="mb-2">
+          <span class="fw-semibold small text-muted">החלטות:</span>
+          <div class="small">{{ m.decisions }}</div>
+        </div>
+        {% endif %}
+        {% if m.summary %}
+        <div class="mb-2">
+          <span class="fw-semibold small text-muted">סיכום:</span>
+          <div class="small">{{ m.summary }}</div>
+        </div>
+        {% endif %}
+        {% if m.needs_followup and m.followup_notes %}
+        <div class="mb-0">
+          <span class="fw-semibold small text-warning-emphasis">המשך טיפול:</span>
+          <div class="small">{{ m.followup_notes }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if current_user.is_admin %}
+    <div class="modal fade" id="deleteModal{{ m.id }}" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>מחיקת פגישה</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p>האם למחוק את הפגישה <strong>{{ m.title or m.date.strftime('%d/%m/%Y') }}</strong>?</p>
+            <p class="text-muted small">פעולה זו אינה ניתנת לשחזור.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ביטול</button>
+            <form method="POST" action="{{ url_for('meeting_delete', meeting_id=m.id) }}" class="d-inline">
+              <button type="submit" class="btn btn-danger"><i class="bi bi-trash3"></i> מחק</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-calendar-event display-3"></i>
+  <h5 class="mt-3">אין פגישות מתועדות</h5>
+  <p>לחצי על "פגישה חדשה" כדי להוסיף תיעוד פגישה</p>
+</div>
+{% endif %}
+
+{% endblock %}

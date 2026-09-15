@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'עריכת' if meeting else 'הוספת' }} פגישה — מערכת ייעוץ{% endblock %}
+{% block page_title %}{{ 'עריכת פגישה' if meeting else 'פגישה חדשה' }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('meetings_list') }}" class="btn btn-outline-secondary btn-sm">
+  <i class="bi bi-arrow-right"></i> חזרה לרשימה
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-10">
+    <form method="POST"
+          action="{{ url_for('meeting_edit', meeting_id=meeting.id) if meeting else url_for('meeting_add') }}">
+
+      <div class="row g-4">
+
+        <!-- Right Column: Basic details -->
+        <div class="col-md-4">
+          <div class="card mb-3">
+            <div class="card-header fw-semibold"><i class="bi bi-calendar-event-fill text-primary me-2"></i>פרטי הפגישה</div>
+            <div class="card-body">
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">כותרת הפגישה</label>
+                <input type="text" name="title" class="form-control"
+                       value="{{ meeting.title or '' if meeting else '' }}"
+                       placeholder="לדוג׳: ישיבת צוות חינוכי">
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">תאריך <span class="text-danger">*</span></label>
+                <input type="date" name="date" class="form-control" dir="ltr" required
+                       value="{{ meeting.date.strftime('%Y-%m-%d') if meeting else today.strftime('%Y-%m-%d') }}">
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">משתתפים</label>
+                <textarea name="participants" class="form-control" rows="3"
+                          placeholder="מי השתתף בפגישה...">{{ meeting.participants or '' if meeting else '' }}</textarea>
+              </div>
+
+              <hr>
+
+              <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" role="switch" id="needsFollowup"
+                       name="needs_followup" {% if meeting and meeting.needs_followup %}checked{% endif %}>
+                <label class="form-check-label fw-semibold" for="needsFollowup">נדרש המשך טיפול</label>
+              </div>
+
+              <div id="followupFields" class="{{ '' if meeting and meeting.needs_followup else 'd-none' }}">
+                <div class="mb-3">
+                  <label class="form-label fw-semibold">תאריך המשך טיפול</label>
+                  <input type="date" name="followup_date" class="form-control" dir="ltr"
+                         value="{{ meeting.followup_date.strftime('%Y-%m-%d') if meeting and meeting.followup_date else '' }}">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label fw-semibold">פרטי המשך הטיפול</label>
+                  <textarea name="followup_notes" class="form-control" rows="3"
+                            placeholder="מה צריך להמשיך לטפל בו...">{{ meeting.followup_notes or '' if meeting else '' }}</textarea>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- Left Column: Content -->
+        <div class="col-md-8">
+          <div class="card">
+            <div class="card-header fw-semibold"><i class="bi bi-pencil-square text-primary me-2"></i>תוכן הפגישה</div>
+            <div class="card-body">
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">תיעוד הפגישה <span class="text-danger">*</span></label>
+                <textarea name="documentation" class="form-control" rows="6" required
+                          placeholder="תיעוד מפורט של מהלך הפגישה...">{{ meeting.documentation if meeting else '' }}</textarea>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">החלטות</label>
+                <textarea name="decisions" class="form-control" rows="3"
+                          placeholder="מה הוחלט בפגישה?">{{ meeting.decisions or '' if meeting else '' }}</textarea>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">סיכום</label>
+                <textarea name="summary" class="form-control" rows="3"
+                          placeholder="סיכום קצר של הפגישה...">{{ meeting.summary or '' if meeting else '' }}</textarea>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <div class="mt-4 d-flex justify-content-end gap-2">
+        <a href="{{ url_for('meetings_list') }}" class="btn btn-outline-secondary">ביטול</a>
+        <button type="submit" class="btn btn-primary px-5">
+          <i class="bi bi-check-lg"></i>
+          {{ 'שמור שינויים' if meeting else 'שמור פגישה' }}
+        </button>
+      </div>
+
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('needsFollowup').addEventListener('change', function() {
+  document.getElementById('followupFields').classList.toggle('d-none', !this.checked);
+});
+</script>
+{% endblock %}

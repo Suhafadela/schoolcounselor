@@ -251,6 +251,27 @@ class FollowUpTask(db.Model):
         return f'<FollowUpTask {self.id} due={self.due_date}>'
 
 
+class SchoolMeeting(db.Model):
+    """General school meetings (staff, parents, external bodies) — not tied to one student."""
+    __tablename__ = 'school_meeting'
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, nullable=False, default=date.today)
+    title = db.Column(db.String(200))
+    participants = db.Column(db.Text)
+    documentation = db.Column(db.Text, nullable=False)
+    decisions = db.Column(db.Text)
+    summary = db.Column(db.Text)
+    needs_followup = db.Column(db.Boolean, default=False)
+    followup_date = db.Column(db.Date)
+    followup_notes = db.Column(db.Text)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<SchoolMeeting {self.id} date={self.date}>'
+
+
 class Attachment(db.Model):
     __tablename__ = 'attachment'
     id = db.Column(db.Integer, primary_key=True)

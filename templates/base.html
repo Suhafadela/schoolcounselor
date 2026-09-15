@@ -63,6 +63,13 @@
       </a>
     </li>
     <li class="nav-item">
+      <a class="nav-link {% if 'meeting' in (request.endpoint or '') %}active{% endif %}"
+         href="{{ url_for('meetings_list') }}">
+        <i class="bi bi-calendar-event-fill"></i>
+        <span>פגישות בית ספר</span>
+      </a>
+    </li>
+    <li class="nav-item">
       <a class="nav-link {% if request.endpoint == 'reminders' %}active{% endif %}"
          href="{{ url_for('reminders') }}">
         <i class="bi bi-bell-fill"></i>
