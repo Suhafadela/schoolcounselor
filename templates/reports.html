@@ -3,6 +3,9 @@
 {% block page_title %}דוחות וסינון{% endblock %}
 
 {% block topbar_actions %}
+<a href="{{ url_for('documentation_report') }}" class="btn btn-outline-primary btn-sm">
+  <i class="bi bi-journal-text"></i> דוח תיעודים לפי תקופה
+</a>
 {% if students %}
 <a href="{{ url_for('reports_export') }}?{{ request.query_string.decode() }}" class="btn btn-success btn-sm">
   <i class="bi bi-file-excel-fill"></i> ייצוא Excel

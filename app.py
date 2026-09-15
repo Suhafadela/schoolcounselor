@@ -1607,6 +1607,165 @@ def register_routes(app):
         response.headers['Content-Disposition'] = 'attachment; filename=report.pdf'
         return response
 
+    # ── Documentation Report (all students, filtered by date range) ────────
+    def _report_date_range(args):
+        today = date.today()
+        from_str = args.get('from', '')
+        to_str = args.get('to', '')
+        try:
+            from_date = datetime.strptime(from_str, '%Y-%m-%d').date() if from_str else today.replace(day=1)
+        except ValueError:
+            from_date = today.replace(day=1)
+        try:
+            to_date = datetime.strptime(to_str, '%Y-%m-%d').date() if to_str else today
+        except ValueError:
+            to_date = today
+        return from_date, to_date
+
+    @app.route('/documentation/report')
+    @login_required
+    def documentation_report():
+        from_date, to_date = _report_date_range(request.args)
+        docs = (Documentation.query
+                .filter(Documentation.date >= from_date, Documentation.date <= to_date)
+                .order_by(Documentation.date.desc())
+                .all())
+        return render_template('documentation/report.html', docs=docs,
+                               from_date=from_date, to_date=to_date)
+
+    @app.route('/documentation/report/export-pdf')
+    @login_required
+    def documentation_report_export_pdf():
+        from io import BytesIO
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.lib import colors
+        from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
+                                        HRFlowable, KeepTogether)
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+
+        FONT_NAME = 'NotoMerged'
+        FONT_BOLD = 'NotoMerged-Bold'
+        font_registered = False
+        try:
+            reg_path = os.path.join(BASE_DIR, 'fonts', 'NotoMerged-Regular.ttf')
+            bold_path = os.path.join(BASE_DIR, 'fonts', 'NotoMerged-Bold.ttf')
+            if os.path.exists(reg_path) and os.path.exists(bold_path):
+                pdfmetrics.registerFont(TTFont(FONT_NAME, reg_path))
+                pdfmetrics.registerFont(TTFont(FONT_BOLD, bold_path))
+                font_registered = True
+        except Exception:
+            pass
+        if not font_registered:
+            FONT_NAME = 'Helvetica'
+            FONT_BOLD = 'Helvetica-Bold'
+
+        def rtl(text):
+            if not text:
+                return ''
+            text = str(text)
+            try:
+                from bidi.algorithm import get_display
+                try:
+                    import arabic_reshaper
+                    text = arabic_reshaper.reshape(text)
+                except ImportError:
+                    pass
+                return get_display(text)
+            except ImportError:
+                return ' '.join(reversed(text.split()))
+
+        def fmt_date(d):
+            return d.strftime('%d/%m/%Y') if d else '—'
+
+        PRIMARY = colors.HexColor('#2B6CB0')
+        GRAY = colors.HexColor('#718096')
+        RED = colors.HexColor('#C53030')
+        ORANGE = colors.HexColor('#C05621')
+        ACCENT = colors.HexColor('#276749')
+
+        def style(size=10, bold=False, color=colors.black, align='RIGHT'):
+            return ParagraphStyle(
+                name='_', fontName=FONT_BOLD if bold else FONT_NAME,
+                fontSize=size, textColor=color,
+                alignment={'RIGHT': 2, 'LEFT': 0, 'CENTER': 1}.get(align, 2),
+                leading=size * 1.4, wordWrap='RTL',
+            )
+
+        from_date, to_date = _report_date_range(request.args)
+        docs = (Documentation.query
+                .filter(Documentation.date >= from_date, Documentation.date <= to_date)
+                .order_by(Documentation.date.desc())
+                .all())
+
+        buf = BytesIO()
+        pdf_doc = SimpleDocTemplate(buf, pagesize=A4,
+                                    rightMargin=2*cm, leftMargin=2*cm,
+                                    topMargin=2*cm, bottomMargin=2*cm,
+                                    title='דוח תיעודים')
+        story = []
+        W = A4[0] - 4*cm
+
+        story.append(Paragraph(rtl('מערכת ייעוץ חינוכי — דוח תיעודים'), style(size=9, color=GRAY)))
+        story.append(Spacer(1, 0.3*cm))
+        story.append(Paragraph(rtl('דוח תיעודים'), style(size=18, bold=True, color=PRIMARY)))
+        story.append(Spacer(1, 0.2*cm))
+        story.append(Paragraph(
+            rtl(f'מתאריך {fmt_date(from_date)} עד {fmt_date(to_date)}  |  סה"כ תיעודים: {len(docs)}'),
+            style(size=11, color=GRAY)))
+        story.append(Spacer(1, 0.15*cm))
+        story.append(HRFlowable(width=W, color=PRIMARY, thickness=2))
+        story.append(Spacer(1, 0.4*cm))
+
+        if docs:
+            for doc in docs:
+                urg_color = {'high': RED, 'medium': ORANGE, 'low': ACCENT}.get(doc.urgency, GRAY)
+                cats = ', '.join(c.category_name for c in doc.categories) if doc.categories else ''
+                block = []
+                block.append(Paragraph(
+                    rtl(f'{doc.student.full_name}  —  {doc.student.class_name}'),
+                    style(size=12, bold=True, color=PRIMARY)))
+                block.append(Paragraph(
+                    rtl(f'{fmt_date(doc.date)}  |  {URGENCY_LABELS.get(doc.urgency, "")}'),
+                    style(size=9, color=urg_color, bold=True)))
+                if cats:
+                    block.append(Paragraph(rtl(cats), style(size=9, color=GRAY)))
+                if doc.participants:
+                    block.append(Paragraph(rtl(f'משתתפים: {doc.participants}'), style(size=9, color=GRAY)))
+                if doc.summary:
+                    block.append(Spacer(1, 0.1*cm))
+                    block.append(Paragraph(rtl(doc.summary), style(size=10)))
+                if doc.concerns:
+                    block.append(Paragraph(rtl(f'קשיים: {doc.concerns}'), style(size=9, color=GRAY)))
+                if doc.decisions:
+                    block.append(Paragraph(rtl(f'החלטות: {doc.decisions}'), style(size=9, color=GRAY)))
+                if doc.next_steps:
+                    block.append(Paragraph(rtl(f'צעדים הבאים: {doc.next_steps}'), style(size=9, color=GRAY)))
+                if doc.followup_date:
+                    block.append(Paragraph(rtl(f'מעקב: {fmt_date(doc.followup_date)}'),
+                                           style(size=9, color=ACCENT)))
+                story.append(KeepTogether(block))
+                story.append(HRFlowable(width=W, color=colors.HexColor('#E2E8F0'), thickness=0.3))
+                story.append(Spacer(1, 0.25*cm))
+        else:
+            story.append(Paragraph(rtl('אין תיעודים בטווח התאריכים שנבחר.'), style(size=10, color=GRAY)))
+
+        story.append(Spacer(1, 0.5*cm))
+        story.append(HRFlowable(width=W, color=GRAY, thickness=0.5))
+        story.append(Spacer(1, 0.1*cm))
+        story.append(Paragraph(
+            rtl(f'הופק בתאריך {date.today().strftime("%d/%m/%Y")} | מערכת ייעוץ חינוכי'),
+            style(size=8, color=GRAY)))
+
+        pdf_doc.build(story)
+        buf.seek(0)
+        response = make_response(buf.read())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = 'attachment; filename="documentation_report.pdf"'
+        return response
+
     def _filtered_students(args):
         grade = args.get('grade', '')
         class_name = args.get('class', '')
