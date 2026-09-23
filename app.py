@@ -654,25 +654,30 @@ def register_routes(app):
         from google import genai
         return genai.Client(api_key=api_key)
 
-    def _gemini_generate(contents, retries=3):
-        """Call Gemini with a couple of retries — the free tier occasionally
-        returns a transient 503 'high demand' error."""
+    # Tried in order; the free tier occasionally returns a transient 503
+    # "high demand" error on one model but not another, so falling back
+    # across a few models is far more reliable than retrying just one.
+    GEMINI_MODELS = ['gemini-flash-lite-latest', 'gemini-flash-latest',
+                     'gemini-3.5-flash']
+
+    def _gemini_generate(contents, retries_per_model=2):
         import time
         client = _gemini_client()
         if not client:
             raise RuntimeError('לא הוגדר מפתח GEMINI_API_KEY במערכת.')
         last_error = None
-        for attempt in range(retries):
-            try:
-                response = client.models.generate_content(
-                    model='gemini-flash-latest',
-                    contents=contents,
-                )
-                return response.text
-            except Exception as e:
-                last_error = e
-                if attempt < retries - 1:
-                    time.sleep(2)
+        for model in GEMINI_MODELS:
+            for attempt in range(retries_per_model):
+                try:
+                    response = client.models.generate_content(
+                        model=model,
+                        contents=contents,
+                    )
+                    return response.text
+                except Exception as e:
+                    last_error = e
+                    if attempt < retries_per_model - 1:
+                        time.sleep(2)
         raise last_error
 
     @app.route('/api/polish-text', methods=['POST'])
