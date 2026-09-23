@@ -1020,6 +1020,63 @@ def register_routes(app):
         flash('התלמיד נמחק מהמערכת.', 'success')
         return redirect(url_for('students_list'))
 
+    @app.route('/api/student/<int:student_id>/intervention-plan', methods=['POST'])
+    @login_required
+    def api_intervention_plan(student_id):
+        student = Student.query.get_or_404(student_id)
+        docs = (Documentation.query
+                .filter_by(student_id=student_id)
+                .order_by(Documentation.date.asc()).all())
+        services = (SupportService.query
+                    .filter_by(student_id=student_id)
+                    .order_by(SupportService.start_date.asc()).all())
+
+        if not docs:
+            return jsonify({'error': 'אין עדיין תיעודים לתלמיד/ה הזו — אי אפשר לבנות המלצה בלי היסטוריה.'}), 400
+
+        lines = [f'תלמיד/ה: {student.full_name}, כיתה {student.class_name}, סטטוס נוכחי: '
+                 f'{STATUS_LABELS.get(student.status, student.status)}', '']
+        lines.append('היסטוריית תיעודים (מהישן לחדש):')
+        for d in docs:
+            cats = ', '.join(c.category_name for c in d.categories) if d.categories else ''
+            lines.append(f'--- {d.date.strftime("%d/%m/%Y")} (דחיפות: {URGENCY_LABELS.get(d.urgency, "")}) {cats}')
+            if d.summary:
+                lines.append(f'סיכום: {d.summary}')
+            if d.concerns:
+                lines.append(f'קשיים: {d.concerns}')
+            if d.decisions:
+                lines.append(f'החלטות שהתקבלו: {d.decisions}')
+            if d.next_steps:
+                lines.append(f'צעדים שננקטו: {d.next_steps}')
+        if services:
+            lines.append('')
+            lines.append('שירותי תמיכה קיימים:')
+            for s in services:
+                lines.append(f'- {s.service_type} ({SERVICE_STATUS_LABELS.get(s.status, s.status)})'
+                             + (f', אחראי/ת: {s.responsible_person}' if s.responsible_person else ''))
+
+        history_text = '\n'.join(lines)
+
+        try:
+            prompt = (
+                'את עוזרת מקצועית ליועצת חינוכית בבית ספר. להלן כל היסטוריית '
+                'התיעוד של תלמיד/ה מסוימ/ת. בהתבסס אך ורק על המידע הזה, גבשי '
+                'המלצה מקצועית לתכנית התערבות ייעוצית. כללי בהמלצה:\n'
+                '1. תקציר קצר של התמונה הכוללת (מה המגמה העולה מהתיעודים).\n'
+                '2. יעדים מרכזיים לתכנית ההתערבות.\n'
+                '3. פעולות מומלצות קונקרטיות (כולל גורמים מומלצים למעורבות - '
+                'הורים, מחנכת, גורמי טיפול חיצוניים וכו׳ אם רלוונטי).\n'
+                '4. קצב מעקב מומלץ (כל כמה זמן לבדוק התקדמות).\n\n'
+                'חשוב: זו המלצה לשיקול דעת היועצת בלבד, לא קביעה קלינית. '
+                'התבססי רק על מה שכתוב בתיעוד — אל תמציאי פרטים שלא הוזכרו. '
+                'כתבי בעברית תקנית ומקצועית, בפורמט מסודר עם כותרות משנה קצרות.\n\n'
+                f'{history_text}'
+            )
+            plan = _gemini_generate(prompt)
+            return jsonify({'plan': (plan or '').strip()})
+        except Exception as e:
+            return jsonify({'error': f'שגיאה ביצירת ההמלצה: {e}'}), 503
+
     @app.route('/students/<int:student_id>/print')
     @login_required
     def student_print(student_id):
