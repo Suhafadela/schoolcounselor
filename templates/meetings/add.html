@@ -73,9 +73,21 @@
             <div class="card-body">
 
               <div class="mb-3">
-                <label class="form-label fw-semibold">תיעוד הפגישה <span class="text-danger">*</span></label>
-                <textarea name="documentation" class="form-control" rows="6" required
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">
+                  <label class="form-label fw-semibold mb-0">תיעוד הפגישה <span class="text-danger">*</span></label>
+                  <div class="d-flex gap-2">
+                    <input type="file" id="ocrFile" accept="image/png,image/jpeg,image/webp" class="d-none">
+                    <button type="button" id="ocrBtn" class="btn btn-sm btn-outline-secondary">
+                      <i class="bi bi-camera-fill"></i> תמונה בכתב יד
+                    </button>
+                    <button type="button" id="polishBtn" class="btn btn-sm btn-outline-primary">
+                      <i class="bi bi-stars"></i> שכתוב מקצועי
+                    </button>
+                  </div>
+                </div>
+                <textarea name="documentation" id="meetingDocField" class="form-control" rows="6" required
                           placeholder="תיעוד מפורט של מהלך הפגישה...">{{ meeting.documentation if meeting else '' }}</textarea>
+                <div class="form-text">אפשר לצלם דף בכתב יד ולהמיר אותו לטקסט, או לשכתב את מה שכתוב כאן בניסוח מקצועי.</div>
               </div>
 
               <div class="mb-3">
@@ -113,6 +125,74 @@
 <script>
 document.getElementById('needsFollowup').addEventListener('change', function() {
   document.getElementById('followupFields').classList.toggle('d-none', !this.checked);
+});
+
+function setBtnLoading(btn, loadingText) {
+  btn.dataset.original = btn.dataset.original || btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> ' + loadingText;
+}
+function resetBtn(btn) {
+  btn.disabled = false;
+  btn.innerHTML = btn.dataset.original;
+}
+
+// Professional rewrite of the meeting documentation field
+document.getElementById('polishBtn').addEventListener('click', async function() {
+  const field = document.getElementById('meetingDocField');
+  const btn = this;
+  if (!field.value.trim()) {
+    alert('אין טקסט לשכתוב.');
+    return;
+  }
+  setBtnLoading(btn, 'משכתבת...');
+  try {
+    const resp = await fetch('{{ url_for("api_polish_text") }}', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text: field.value}),
+    });
+    const data = await resp.json();
+    if (data.polished) {
+      field.value = data.polished;
+    } else {
+      alert(data.error || 'שגיאה בשכתוב הטקסט.');
+    }
+  } catch (e) {
+    alert('שגיאה בתקשורת עם השרת.');
+  } finally {
+    resetBtn(btn);
+  }
+});
+
+// Photo of handwriting -> typed text
+document.getElementById('ocrBtn').addEventListener('click', function() {
+  document.getElementById('ocrFile').click();
+});
+document.getElementById('ocrFile').addEventListener('change', async function() {
+  if (!this.files.length) return;
+  const field = document.getElementById('meetingDocField');
+  const btn = document.getElementById('ocrBtn');
+  setBtnLoading(btn, 'קוראת את הכתב...');
+  const formData = new FormData();
+  formData.append('image', this.files[0]);
+  try {
+    const resp = await fetch('{{ url_for("api_ocr_handwriting") }}', {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await resp.json();
+    if (data.text) {
+      field.value = field.value.trim() ? field.value + '\n\n' + data.text : data.text;
+    } else {
+      alert(data.error || 'שגיאה בזיהוי הטקסט.');
+    }
+  } catch (e) {
+    alert('שגיאה בתקשורת עם השרת.');
+  } finally {
+    resetBtn(btn);
+    this.value = '';
+  }
 });
 </script>
 {% endblock %}
