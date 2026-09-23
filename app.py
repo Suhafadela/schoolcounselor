@@ -646,6 +646,87 @@ def register_routes(app):
                         'label': STATUS_LABELS.get(student.status, ''),
                         'color': STATUS_COLORS.get(student.status, '')})
 
+    # ── AI helpers (Gemini): polish text, read handwriting from a photo ─────
+    def _gemini_client():
+        api_key = os.environ.get('GEMINI_API_KEY')
+        if not api_key:
+            return None
+        from google import genai
+        return genai.Client(api_key=api_key)
+
+    def _gemini_generate(contents, retries=3):
+        """Call Gemini with a couple of retries — the free tier occasionally
+        returns a transient 503 'high demand' error."""
+        import time
+        client = _gemini_client()
+        if not client:
+            raise RuntimeError('לא הוגדר מפתח GEMINI_API_KEY במערכת.')
+        last_error = None
+        for attempt in range(retries):
+            try:
+                response = client.models.generate_content(
+                    model='gemini-flash-latest',
+                    contents=contents,
+                )
+                return response.text
+            except Exception as e:
+                last_error = e
+                if attempt < retries - 1:
+                    time.sleep(2)
+        raise last_error
+
+    @app.route('/api/polish-text', methods=['POST'])
+    @login_required
+    def api_polish_text():
+        text = (request.get_json(silent=True) or {}).get('text', '').strip()
+        if not text:
+            return jsonify({'error': 'לא הוזן טקסט.'}), 400
+        try:
+            prompt = (
+                'את עוזרת ליועצת חינוכית בבית ספר. שכתבי מחדש את הטקסט הבא '
+                'בעברית תקנית, מקצועית ומסודרת, כפי שמתאים לתיעוד רשמי. '
+                'שמרי במדויק על כל התוכן והמשמעות המקוריים — אל תמציאי '
+                'פרטים חדשים ואל תשמיטי מידע. החזירי אך ורק את הטקסט '
+                'המשוכתב, בלי הקדמות, הערות או כותרות.\n\n'
+                f'הטקסט לשכתוב:\n{text}'
+            )
+            polished = _gemini_generate(prompt)
+            return jsonify({'polished': (polished or '').strip()})
+        except Exception as e:
+            return jsonify({'error': f'שגיאה בשכתוב הטקסט: {e}'}), 503
+
+    @app.route('/api/ocr-handwriting', methods=['POST'])
+    @login_required
+    def api_ocr_handwriting():
+        f = request.files.get('image')
+        if not f or not f.filename:
+            return jsonify({'error': 'לא נבחרה תמונה.'}), 400
+
+        ext = f.filename.rsplit('.', 1)[-1].lower() if '.' in f.filename else ''
+        mime_map = {'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+                    'webp': 'image/webp', 'heic': 'image/heic'}
+        mime_type = mime_map.get(ext)
+        if not mime_type:
+            return jsonify({'error': 'יש להעלות קובץ תמונה (JPG / PNG / WEBP).'}), 400
+
+        image_bytes = f.read()
+        try:
+            from google.genai import types
+            prompt = (
+                'זהו צילום של דף תיעוד בכתב יד של יועצת חינוכית בבית ספר. '
+                'תמללי את כל הטקסט הכתוב בתמונה במדויק כפי שהוא, לטקסט '
+                'מודפס בעברית (או בשפה שבה נכתב המקור). אל תוסיפי פרשנות, '
+                'סיכום או הערות משלך — רק את התמלול המדויק של מה שכתוב.'
+            )
+            contents = [
+                types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+                types.Part.from_text(text=prompt),
+            ]
+            text = _gemini_generate(contents)
+            return jsonify({'text': (text or '').strip()})
+        except Exception as e:
+            return jsonify({'error': f'שגיאה בזיהוי הטקסט: {e}'}), 503
+
     # ── Documentation ──────────────────────────────────────────────────────
     @app.route('/documentation/add', methods=['GET', 'POST'])
     @login_required
