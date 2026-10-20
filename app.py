@@ -1103,7 +1103,7 @@ def register_routes(app):
         from reportlab.lib.styles import ParagraphStyle
         from reportlab.lib.units import cm
         from reportlab.lib import colors
-        from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
+        from reportlab.platypus import (SimpleDocTemplate, Spacer,
                                         Table, TableStyle, HRFlowable, KeepTogether)
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
@@ -1120,59 +1120,18 @@ def register_routes(app):
                  .filter_by(is_completed=False)
                  .order_by(FollowUpTask.due_date).all())
 
-        # Register a bundled Unicode font that covers both Hebrew and Arabic
-        # (Noto Sans Hebrew + Noto Sans Arabic merged into one font file).
-        # Bundled in the repo so it works the same on any server, not just
-        # a Windows machine that happens to have Arial installed locally.
-        FONT_NAME = 'NotoMerged'
-        FONT_BOLD = 'NotoMerged-Bold'
-        font_registered = False
-        try:
-            reg_path = os.path.join(BASE_DIR, 'fonts', 'NotoMerged-Regular.ttf')
-            bold_path = os.path.join(BASE_DIR, 'fonts', 'NotoMerged-Bold.ttf')
-            if os.path.exists(reg_path) and os.path.exists(bold_path):
-                pdfmetrics.registerFont(TTFont(FONT_NAME, reg_path))
-                pdfmetrics.registerFont(TTFont(FONT_BOLD, bold_path))
-                font_registered = True
-        except Exception:
-            pass
-        if not font_registered:
-            # Fall back to Windows Arial if available (local dev machine),
-            # otherwise Helvetica (no Hebrew/Arabic glyphs — last resort).
-            FONT_NAME = 'Arial'
-            FONT_BOLD = 'Arial-Bold'
-            for font_path, bold_path in [
-                (r'C:\Windows\Fonts\arial.ttf', r'C:\Windows\Fonts\arialbd.ttf'),
-                (r'C:\Windows\Fonts\ARIAL.TTF', r'C:\Windows\Fonts\ARIALBD.TTF'),
-            ]:
-                if os.path.exists(font_path) and os.path.exists(bold_path):
-                    try:
-                        pdfmetrics.registerFont(TTFont(FONT_NAME, font_path))
-                        pdfmetrics.registerFont(TTFont(FONT_BOLD, bold_path))
-                        font_registered = True
-                        break
-                    except Exception:
-                        pass
-        if not font_registered:
-            FONT_NAME = 'Helvetica'
-            FONT_BOLD = 'Helvetica-Bold'
+        # RTL text: wrap in logical order first, then convert each line to
+        # visual order (see pdf_rtl.py). `Paragraph` below is a shim that
+        # builds right-to-left text blocks from the same style objects.
+        from pdf_rtl import register_fonts, RTLText
+        FONT_NAME, FONT_BOLD = register_fonts(BASE_DIR)
 
-        # RTL helper — use python-bidi if available, else reverse words
         def rtl(text):
-            if not text:
-                return ''
-            text = str(text)
-            try:
-                from bidi.algorithm import get_display
-                try:
-                    import arabic_reshaper
-                    text = arabic_reshaper.reshape(text)
-                except ImportError:
-                    pass
-                return get_display(text)
-            except ImportError:
-                # Simple fallback: reverse the word order for RTL display
-                return ' '.join(reversed(text.split()))
+            return str(text) if text else ''
+
+        def Paragraph(text, st):
+            return RTLText(text, st.fontName, st.fontSize, st.textColor, st.leading,
+                           {2: 'RIGHT', 0: 'LEFT', 1: 'CENTER'}.get(st.alignment, 'RIGHT'))
 
         def fmt_date(d):
             return d.strftime('%d/%m/%Y') if d else '—'
@@ -1648,7 +1607,7 @@ def register_routes(app):
     def reports_export_pdf():
         try:
             from reportlab.lib.pagesizes import A4
-            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer
             from reportlab.lib.styles import ParagraphStyle
             from reportlab.lib import colors
             from reportlab.pdfbase import pdfmetrics
@@ -1659,38 +1618,18 @@ def register_routes(app):
 
         import io
 
-        # Register the bundled Unicode font (Hebrew + Arabic) — same font
-        # used for the student PDF export, so this works on any server.
-        FONT_NAME = 'NotoMerged'
-        FONT_BOLD = 'NotoMerged-Bold'
-        font_registered = False
-        try:
-            reg_path = os.path.join(BASE_DIR, 'fonts', 'NotoMerged-Regular.ttf')
-            bold_path = os.path.join(BASE_DIR, 'fonts', 'NotoMerged-Bold.ttf')
-            if os.path.exists(reg_path) and os.path.exists(bold_path):
-                pdfmetrics.registerFont(TTFont(FONT_NAME, reg_path))
-                pdfmetrics.registerFont(TTFont(FONT_BOLD, bold_path))
-                font_registered = True
-        except Exception:
-            pass
-        if not font_registered:
-            FONT_NAME = 'Helvetica'
-            FONT_BOLD = 'Helvetica-Bold'
+        # RTL text: wrap in logical order first, then convert each line to
+        # visual order (see pdf_rtl.py). `Paragraph` below is a shim that
+        # builds right-to-left text blocks from the same style objects.
+        from pdf_rtl import register_fonts, RTLText
+        FONT_NAME, FONT_BOLD = register_fonts(BASE_DIR)
 
         def rtl(text):
-            if not text:
-                return ''
-            text = str(text)
-            try:
-                from bidi.algorithm import get_display
-                try:
-                    import arabic_reshaper
-                    text = arabic_reshaper.reshape(text)
-                except ImportError:
-                    pass
-                return get_display(text)
-            except ImportError:
-                return ' '.join(reversed(text.split()))
+            return str(text) if text else ''
+
+        def Paragraph(text, st):
+            return RTLText(text, st.fontName, st.fontSize, st.textColor, st.leading,
+                           {2: 'RIGHT', 0: 'LEFT', 1: 'CENTER'}.get(st.alignment, 'RIGHT'))
 
         def style(size=10, bold=False, color=colors.black, align='RIGHT'):
             return ParagraphStyle(
@@ -1784,41 +1723,23 @@ def register_routes(app):
         from reportlab.lib.styles import ParagraphStyle
         from reportlab.lib.units import cm
         from reportlab.lib import colors
-        from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
+        from reportlab.platypus import (SimpleDocTemplate, Spacer,
                                         HRFlowable, KeepTogether)
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
 
-        FONT_NAME = 'NotoMerged'
-        FONT_BOLD = 'NotoMerged-Bold'
-        font_registered = False
-        try:
-            reg_path = os.path.join(BASE_DIR, 'fonts', 'NotoMerged-Regular.ttf')
-            bold_path = os.path.join(BASE_DIR, 'fonts', 'NotoMerged-Bold.ttf')
-            if os.path.exists(reg_path) and os.path.exists(bold_path):
-                pdfmetrics.registerFont(TTFont(FONT_NAME, reg_path))
-                pdfmetrics.registerFont(TTFont(FONT_BOLD, bold_path))
-                font_registered = True
-        except Exception:
-            pass
-        if not font_registered:
-            FONT_NAME = 'Helvetica'
-            FONT_BOLD = 'Helvetica-Bold'
+        # RTL text: wrap in logical order first, then convert each line to
+        # visual order (see pdf_rtl.py). `Paragraph` below is a shim that
+        # builds right-to-left text blocks from the same style objects.
+        from pdf_rtl import register_fonts, RTLText
+        FONT_NAME, FONT_BOLD = register_fonts(BASE_DIR)
 
         def rtl(text):
-            if not text:
-                return ''
-            text = str(text)
-            try:
-                from bidi.algorithm import get_display
-                try:
-                    import arabic_reshaper
-                    text = arabic_reshaper.reshape(text)
-                except ImportError:
-                    pass
-                return get_display(text)
-            except ImportError:
-                return ' '.join(reversed(text.split()))
+            return str(text) if text else ''
+
+        def Paragraph(text, st):
+            return RTLText(text, st.fontName, st.fontSize, st.textColor, st.leading,
+                           {2: 'RIGHT', 0: 'LEFT', 1: 'CENTER'}.get(st.alignment, 'RIGHT'))
 
         def fmt_date(d):
             return d.strftime('%d/%m/%Y') if d else '—'
