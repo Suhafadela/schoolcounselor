@@ -85,9 +85,27 @@ def create_app():
     login_manager.login_message = 'יש להתחבר כדי לגשת לדף זה.'
     login_manager.login_message_category = 'warning'
 
+    # Cache user rows for a minute: the user is loaded on every request and
+    # each database round trip to the cloud DB costs ~100ms. A transient copy
+    # (not attached to the DB session) is enough for login/role checks.
+    import time as _time_mod
+    _user_cache = {}
+
     @login_manager.user_loader
     def load_user(user_id):
-        return User.query.get(int(user_id))
+        uid = int(user_id)
+        now = _time_mod.monotonic()
+        hit = _user_cache.get(uid)
+        if hit and now - hit[0] < 60:
+            snap = hit[1]
+        else:
+            u = db.session.get(User, uid)
+            if u is None:
+                _user_cache.pop(uid, None)
+                return None
+            snap = {c.key: getattr(u, c.key) for c in User.__table__.columns}
+            _user_cache[uid] = (now, snap)
+        return User(**snap)
 
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
