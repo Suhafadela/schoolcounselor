@@ -311,8 +311,8 @@
           <span class="doc-urgency urgency-{{ doc.urgency }}">
             {{ {'high':'⚠ דחוף','medium':'◉ בינוני','low':'○ רגיל'}.get(doc.urgency, '') }}
           </span>
-          {% if doc.categories %}
-          <span class="doc-cats">{{ doc.categories | map(attribute='category_name') | join(' · ') }}</span>
+          {% if doc.categories_list %}
+          <span class="doc-cats">{{ doc.categories_list | join(' · ') }}</span>
           {% endif %}
           {% if doc.participants %}
           <span style="color:#718096;">משתתפים: {{ doc.participants }}</span>

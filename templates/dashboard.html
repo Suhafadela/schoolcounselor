@@ -122,8 +122,8 @@
               <small class="text-muted d-block">{{ s.class_name }}</small>
             </div>
             <div class="d-flex gap-2 align-items-center">
-              {% if s.open_tasks_count > 0 %}
-              <span class="badge bg-warning text-dark">{{ s.open_tasks_count }} משימות</span>
+              {% if open_task_counts.get(s.id, 0) > 0 %}
+              <span class="badge bg-warning text-dark">{{ open_task_counts.get(s.id, 0) }} משימות</span>
               {% endif %}
               <a href="{{ url_for('documentation_add', student_id=s.id) }}" class="btn btn-sm btn-outline-primary">
                 <i class="bi bi-plus"></i>

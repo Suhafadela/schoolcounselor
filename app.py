@@ -265,6 +265,23 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def prefetch_categories(docs):
+    """Attach category names to every doc with a single query (avoids one query per doc)."""
+    docs = list(docs)
+    ids = [d.id for d in docs]
+    if not ids:
+        return docs
+    by_doc = {}
+    for doc_id, name in (db.session.query(DocumentationCategory.documentation_id,
+                                          DocumentationCategory.category_name)
+                         .filter(DocumentationCategory.documentation_id.in_(ids))
+                         .order_by(DocumentationCategory.id).all()):
+        by_doc.setdefault(doc_id, []).append(name)
+    for d in docs:
+        d._cats = by_doc.get(d.id, [])
+    return docs
+
+
 _SIDEBAR_CACHE = {}
 
 
@@ -362,6 +379,14 @@ def register_routes(app):
         urgent_students = (Student.query.filter_by(status='urgent')
                            .order_by(Student.updated_at.desc()).limit(10).all())
 
+        urgent_ids = [s.id for s in urgent_students]
+        open_task_counts = {}
+        if urgent_ids:
+            open_task_counts = dict(db.session.query(FollowUpTask.student_id, func.count(FollowUpTask.id))
+                                    .filter(FollowUpTask.student_id.in_(urgent_ids),
+                                            FollowUpTask.is_completed == False)
+                                    .group_by(FollowUpTask.student_id).all())
+
         # Chart data: docs per month (last 6 months)
         # Use date-range filtering so it works on both SQLite (local) and PostgreSQL (Supabase)
         months = []
@@ -387,6 +412,7 @@ def register_routes(app):
                                upcoming_tasks=upcoming_tasks,
                                overdue_tasks=overdue_tasks,
                                urgent_students=urgent_students,
+                               open_task_counts=open_task_counts,
                                docs_by_month=json.dumps(docs_by_month),
                                grade_counts=json.dumps(grade_counts),
                                status_counts_json=json.dumps(status_counts),
@@ -497,7 +523,7 @@ def register_routes(app):
     @login_required
     def student_profile(student_id):
         student = Student.query.get_or_404(student_id)
-        docs = student.documentation.order_by(Documentation.date.desc()).all()
+        docs = prefetch_categories(student.documentation.order_by(Documentation.date.desc()).all())
         services = student.support_services.order_by(SupportService.created_at.desc()).all()
         tasks = student.followup_tasks.order_by(FollowUpTask.due_date).all()
         attachments = student.attachments.order_by(Attachment.uploaded_at.desc()).all()
@@ -1084,7 +1110,7 @@ def register_routes(app):
                  f'{STATUS_LABELS.get(student.status, student.status)}', '']
         lines.append('היסטוריית תיעודים (מהישן לחדש):')
         for d in docs:
-            cats = ', '.join(c.category_name for c in d.categories) if d.categories else ''
+            cats = ', '.join(d.categories_list)
             lines.append(f'--- {d.date.strftime("%d/%m/%Y")} (דחיפות: {URGENCY_LABELS.get(d.urgency, "")}) {cats}')
             if d.summary:
                 lines.append(f'סיכום: {d.summary}')
@@ -1127,7 +1153,7 @@ def register_routes(app):
     @login_required
     def student_print(student_id):
         student = Student.query.get_or_404(student_id)
-        docs = (Documentation.query
+        docs = prefetch_categories(Documentation.query
                 .filter_by(student_id=student_id)
                 .order_by(Documentation.date.desc()).all())
         services = (SupportService.query
@@ -1155,7 +1181,7 @@ def register_routes(app):
         from reportlab.pdfbase.ttfonts import TTFont
 
         student = Student.query.get_or_404(student_id)
-        docs = (Documentation.query
+        docs = prefetch_categories(Documentation.query
                 .filter_by(student_id=student_id)
                 .order_by(Documentation.date.desc()).all())
         services = (SupportService.query
@@ -1267,7 +1293,7 @@ def register_routes(app):
         if docs:
             for doc in docs:
                 urg_color = {'high': RED, 'medium': ORANGE, 'low': ACCENT}.get(doc.urgency, GRAY)
-                cats = ', '.join(c.category_name for c in doc.categories) if doc.categories else ''
+                cats = ', '.join(doc.categories_list)
                 block = []
                 block.append(Paragraph(
                     rtl(f'{fmt_date(doc.date)}  |  {URGENCY_LABELS.get(doc.urgency, "")}'),
@@ -1754,7 +1780,8 @@ def register_routes(app):
     @login_required
     def documentation_report():
         from_date, to_date = _report_date_range(request.args)
-        docs = (Documentation.query
+        docs = prefetch_categories(Documentation.query
+                .options(joinedload(Documentation.student))
                 .filter(Documentation.date >= from_date, Documentation.date <= to_date)
                 .order_by(Documentation.date.desc())
                 .all())
@@ -1805,7 +1832,8 @@ def register_routes(app):
             )
 
         from_date, to_date = _report_date_range(request.args)
-        docs = (Documentation.query
+        docs = prefetch_categories(Documentation.query
+                .options(joinedload(Documentation.student))
                 .filter(Documentation.date >= from_date, Documentation.date <= to_date)
                 .order_by(Documentation.date.desc())
                 .all())
@@ -1832,7 +1860,7 @@ def register_routes(app):
         if docs:
             for doc in docs:
                 urg_color = {'high': RED, 'medium': ORANGE, 'low': ACCENT}.get(doc.urgency, GRAY)
-                cats = ', '.join(c.category_name for c in doc.categories) if doc.categories else ''
+                cats = ', '.join(doc.categories_list)
                 block = []
                 block.append(Paragraph(
                     rtl(f'{doc.student.full_name}  —  {doc.student.class_name}'),

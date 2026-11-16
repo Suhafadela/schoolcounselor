@@ -176,6 +176,9 @@ class Documentation(db.Model):
 
     @property
     def categories_list(self):
+        cached = getattr(self, '_cats', None)
+        if cached is not None:
+            return cached
         return [c.category_name for c in self.categories.all()]
 
     @property
