@@ -11,6 +11,7 @@ from flask_login import (LoginManager, login_user, logout_user,
                          login_required, current_user)
 from werkzeug.utils import secure_filename
 from sqlalchemy import func, or_, select, event
+from sqlalchemy.orm import joinedload
 
 from models import (db, User, Student, Documentation, DocumentationCategory,
                     SupportService, FollowUpTask, Attachment, SchoolMeeting,
@@ -264,6 +265,19 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+_SIDEBAR_CACHE = {}
+
+
+def _sidebar_counts(today):
+    return tuple(db.session.execute(select(
+        select(func.count(Student.id)).where(Student.status == 'urgent').scalar_subquery(),
+        select(func.count(FollowUpTask.id)).where(
+            FollowUpTask.is_completed == False,
+            FollowUpTask.due_date < today,
+        ).scalar_subquery(),
+    )).one())
+
+
 def register_context_processors(app):
     @app.context_processor
     def inject_globals():
@@ -271,13 +285,13 @@ def register_context_processors(app):
         urgent_count = 0
         overdue_count = 0
         if current_user.is_authenticated:
-            urgent_count, overdue_count = db.session.execute(select(
-                select(func.count(Student.id)).where(Student.status == 'urgent').scalar_subquery(),
-                select(func.count(FollowUpTask.id)).where(
-                    FollowUpTask.is_completed == False,
-                    FollowUpTask.due_date < today,
-                ).scalar_subquery(),
-            )).one()
+            import time as _t
+            cached = _SIDEBAR_CACHE.get('v')
+            if cached and cached[0] == today and _t.monotonic() - cached[1] < 30:
+                urgent_count, overdue_count = cached[2], cached[3]
+            else:
+                urgent_count, overdue_count = _sidebar_counts(today)
+                _SIDEBAR_CACHE['v'] = (today, _t.monotonic(), urgent_count, overdue_count)
         return {
             'today': today,
             'urgent_count': urgent_count,
@@ -332,14 +346,14 @@ def register_routes(app):
             if stype in service_counts:
                 service_counts[stype] = cnt
 
-        upcoming_tasks = (FollowUpTask.query
+        upcoming_tasks = (FollowUpTask.query.options(joinedload(FollowUpTask.student))
                           .filter(FollowUpTask.is_completed == False,
                                   FollowUpTask.due_date >= today,
                                   FollowUpTask.due_date <= week_ahead)
                           .order_by(FollowUpTask.due_date)
                           .limit(10).all())
 
-        overdue_tasks = (FollowUpTask.query
+        overdue_tasks = (FollowUpTask.query.options(joinedload(FollowUpTask.student))
                          .filter(FollowUpTask.is_completed == False,
                                  FollowUpTask.due_date < today)
                          .order_by(FollowUpTask.due_date)
@@ -1448,23 +1462,23 @@ def register_routes(app):
         today = date.today()
         week_ahead = today + timedelta(days=7)
 
-        overdue = (FollowUpTask.query
+        overdue = (FollowUpTask.query.options(joinedload(FollowUpTask.student))
                    .filter(FollowUpTask.is_completed == False,
                            FollowUpTask.due_date < today)
                    .order_by(FollowUpTask.due_date).all())
 
-        upcoming = (FollowUpTask.query
+        upcoming = (FollowUpTask.query.options(joinedload(FollowUpTask.student))
                     .filter(FollowUpTask.is_completed == False,
                             FollowUpTask.due_date >= today,
                             FollowUpTask.due_date <= week_ahead)
                     .order_by(FollowUpTask.due_date).all())
 
-        later = (FollowUpTask.query
+        later = (FollowUpTask.query.options(joinedload(FollowUpTask.student))
                  .filter(FollowUpTask.is_completed == False,
                          FollowUpTask.due_date > week_ahead)
                  .order_by(FollowUpTask.due_date).limit(30).all())
 
-        completed = (FollowUpTask.query
+        completed = (FollowUpTask.query.options(joinedload(FollowUpTask.student))
                      .filter(FollowUpTask.is_completed == True)
                      .order_by(FollowUpTask.completed_at.desc()).limit(20).all())
 
