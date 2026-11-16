@@ -10,7 +10,7 @@ from flask import (Flask, render_template, redirect, url_for, request,
 from flask_login import (LoginManager, login_user, logout_user,
                          login_required, current_user)
 from werkzeug.utils import secure_filename
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, select, event
 
 from models import (db, User, Student, Documentation, DocumentationCategory,
                     SupportService, FollowUpTask, Attachment, SchoolMeeting,
@@ -93,6 +93,37 @@ def create_app():
     with app.app_context():
         db.create_all()
         seed_initial_data()
+
+        # Per-request DB timing, exposed as response headers (X-DB-Queries,
+        # X-DB-Ms, X-App-Ms) so slow pages can be diagnosed from outside.
+        import time as _time
+        from flask import g as _g, has_request_context as _in_request
+
+        @event.listens_for(db.engine, 'before_cursor_execute')
+        def _q_start(conn, cursor, statement, parameters, context, executemany):
+            context._q_t0 = _time.perf_counter()
+
+        @event.listens_for(db.engine, 'after_cursor_execute')
+        def _q_end(conn, cursor, statement, parameters, context, executemany):
+            if _in_request():
+                _g.db_q = getattr(_g, 'db_q', 0) + 1
+                _g.db_t = getattr(_g, 'db_t', 0.0) + (_time.perf_counter() - context._q_t0)
+
+    @app.before_request
+    def _req_start():
+        from flask import g
+        import time
+        g.req_t0 = time.perf_counter()
+
+    @app.after_request
+    def _req_timing(resp):
+        from flask import g
+        import time
+        resp.headers['X-DB-Queries'] = str(getattr(g, 'db_q', 0))
+        resp.headers['X-DB-Ms'] = str(int(getattr(g, 'db_t', 0.0) * 1000))
+        if hasattr(g, 'req_t0'):
+            resp.headers['X-App-Ms'] = str(int((time.perf_counter() - g.req_t0) * 1000))
+        return resp
 
     register_routes(app)
     register_context_processors(app)
@@ -240,11 +271,13 @@ def register_context_processors(app):
         urgent_count = 0
         overdue_count = 0
         if current_user.is_authenticated:
-            urgent_count = Student.query.filter_by(status='urgent').count()
-            overdue_count = FollowUpTask.query.filter(
-                FollowUpTask.is_completed == False,
-                FollowUpTask.due_date < today,
-            ).count()
+            urgent_count, overdue_count = db.session.execute(select(
+                select(func.count(Student.id)).where(Student.status == 'urgent').scalar_subquery(),
+                select(func.count(FollowUpTask.id)).where(
+                    FollowUpTask.is_completed == False,
+                    FollowUpTask.due_date < today,
+                ).scalar_subquery(),
+            )).one()
         return {
             'today': today,
             'urgent_count': urgent_count,
@@ -288,17 +321,16 @@ def register_routes(app):
         today = date.today()
         week_ahead = today + timedelta(days=7)
 
-        total_students = Student.query.count()
         status_counts = dict(db.session.query(Student.status, func.count(Student.id))
                              .group_by(Student.status).all())
+        total_students = sum(status_counts.values())
 
-        service_counts = {}
-        for stype in SERVICE_TYPES:
-            cnt = db.session.query(func.count(SupportService.id)).filter(
-                SupportService.service_type == stype,
-                SupportService.status != 'finished',
-            ).scalar()
-            service_counts[stype] = cnt
+        service_counts = {stype: 0 for stype in SERVICE_TYPES}
+        for stype, cnt in (db.session.query(SupportService.service_type, func.count(SupportService.id))
+                           .filter(SupportService.status != 'finished')
+                           .group_by(SupportService.service_type).all()):
+            if stype in service_counts:
+                service_counts[stype] = cnt
 
         upcoming_tasks = (FollowUpTask.query
                           .filter(FollowUpTask.is_completed == False,
@@ -318,16 +350,17 @@ def register_routes(app):
 
         # Chart data: docs per month (last 6 months)
         # Use date-range filtering so it works on both SQLite (local) and PostgreSQL (Supabase)
-        docs_by_month = []
+        months = []
         for i in range(5, -1, -1):
             m = today.replace(day=1) - timedelta(days=30 * i)
-            month_start = m.replace(day=1)
-            month_end = month_start.replace(day=monthrange(month_start.year, month_start.month)[1])
-            cnt = Documentation.query.filter(
-                Documentation.date >= month_start,
-                Documentation.date <= month_end,
-            ).count()
-            docs_by_month.append({'label': m.strftime('%m/%Y'), 'count': cnt})
+            months.append(m.replace(day=1))
+        counts = {}
+        for (d,) in (db.session.query(Documentation.date)
+                     .filter(Documentation.date >= months[0]).all()):
+            key = (d.year, d.month)
+            counts[key] = counts.get(key, 0) + 1
+        docs_by_month = [{'label': ms.strftime('%m/%Y'), 'count': counts.get((ms.year, ms.month), 0)}
+                         for ms in months]
 
         # Chart data: students per grade
         grade_counts = dict(db.session.query(Student.grade_level, func.count(Student.id))
@@ -395,10 +428,9 @@ def register_routes(app):
             ).filter(Documentation.student_id.in_(student_ids)
             ).group_by(Documentation.student_id).all())
 
-        classes = [r[0] for r in db.session.query(Student.class_name)
-                   .distinct().order_by(Student.class_name).all()]
-        grades = [r[0] for r in db.session.query(Student.grade_level)
-                  .distinct().order_by(Student.grade_level).all()]
+        class_grade_rows = db.session.query(Student.grade_level, Student.class_name).distinct().all()
+        classes = sorted({c for _, c in class_grade_rows if c is not None})
+        grades = sorted({g for g, _ in class_grade_rows if g is not None})
 
         return render_template('students/list.html',
                                students=students,
@@ -892,12 +924,12 @@ def register_routes(app):
         if status_filter:
             query = query.filter_by(status=status_filter)
         services = query.order_by(SupportService.service_type, SupportService.status).all()
-        type_counts = {}
-        for st in SERVICE_TYPES:
-            type_counts[st] = SupportService.query.filter(
-                SupportService.service_type == st,
-                SupportService.status != 'finished'
-            ).count()
+        type_counts = {st: 0 for st in SERVICE_TYPES}
+        for st, cnt in (db.session.query(SupportService.service_type, func.count(SupportService.id))
+                        .filter(SupportService.status != 'finished')
+                        .group_by(SupportService.service_type).all()):
+            if st in type_counts:
+                type_counts[st] = cnt
         return render_template('services.html',
                                services=services,
                                type_counts=type_counts,
